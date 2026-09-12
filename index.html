@@ -182,8 +182,15 @@
         </div>
       </div>
 
-      <!-- Right: Action Buttons (Hide Tests, Fit View, Reset) -->
-      <div class="flex items-center gap-2 flex-shrink-0">
+        <button 
+          id="btn-toggle-timetravel" 
+          class="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 text-amber-300 hover:text-amber-200 border border-amber-500/30 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+          title="Open Git History Time-Travel Scrubber"
+        >
+          <i class="fa-solid fa-clock-rotate-left text-xs text-amber-400"></i>
+          <span>Time Travel</span>
+        </button>
+
         <button 
           id="toggle-tests" 
           class="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border border-slate-700/60 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
@@ -225,10 +232,10 @@
     <div id="blast-status-banner" class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-amber-950/80 backdrop-blur-md border border-orange-500/50 rounded-xl px-4 py-2 text-xs text-orange-200 shadow-2xl flex items-center gap-3 animate-bounce-subtle">
       <div class="flex items-center gap-2">
         <i class="fa-solid fa-bolt-lightning text-orange-400 text-sm animate-pulse"></i>
-        <span>Blast Simulation: <strong id="blast-target-name" class="font-mono text-white"></strong> &rarr; <strong id="blast-affected-count" class="text-orange-300">0</strong> downstream modules affected</span>
+        <span>Blast Wave: <strong id="blast-target-name" class="font-mono text-white"></strong> &rarr; <strong id="blast-affected-count" class="text-orange-300">0</strong> downstream modules affected</span>
       </div>
       <button id="btn-clear-blast" class="px-2.5 py-0.5 bg-orange-600/60 hover:bg-orange-600 text-white rounded-lg text-[11px] font-semibold transition-all">
-        Clear
+        Clear Wave
       </button>
     </div>
 
@@ -243,6 +250,68 @@
       <button id="ctrl-physics" class="w-9 h-9 bg-slate-900/80 hover:bg-slate-800 text-amber-400 border border-slate-700/50 rounded-xl flex items-center justify-center text-sm shadow-xl backdrop-blur-md transition-all active:scale-90" title="Toggle Physics Simulation">
         <i class="fa-solid fa-atom"></i>
       </button>
+    </div>
+
+    <!-- Floating Time-Travel Playback Dock -->
+    <div id="timetravel-dock" class="hidden absolute bottom-4 left-1/2 -translate-x-1/2 z-20 w-[540px] max-w-[90vw] glass-panel rounded-2xl p-3.5 shadow-2xl flex flex-col gap-2.5 transition-all duration-300 border border-amber-500/30">
+      <!-- Commit Info Header Badge -->
+      <div class="flex items-center justify-between text-xs border-b border-slate-700/50 pb-2">
+        <div class="flex items-center gap-2 truncate">
+          <i class="fa-solid fa-clock-rotate-left text-amber-400 text-xs"></i>
+          <span class="font-bold text-slate-300 text-[11px] uppercase tracking-wider">Time Travel:</span>
+          <span id="commit-badge-hash" class="font-mono text-amber-300 bg-amber-950/70 border border-amber-500/40 px-1.5 py-0.5 rounded text-[10px]">#latest</span>
+          <span id="commit-badge-msg" class="text-slate-200 truncate font-medium max-w-[260px]" title="Commit message">Loading commits...</span>
+        </div>
+        <div class="flex items-center gap-2 text-[10px] text-slate-400 font-mono flex-shrink-0">
+          <span id="commit-badge-date">--</span>
+          <button id="btn-close-timetravel" class="text-slate-400 hover:text-white p-0.5 transition-colors" title="Close Time Travel">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Slider & Playback Controls Row -->
+      <div class="flex items-center gap-3">
+        <button id="btn-history-prev" class="w-7 h-7 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 rounded-lg flex items-center justify-center text-xs transition-all active:scale-90" title="Step Back (Older Commit)">
+          <i class="fa-solid fa-backward-step"></i>
+        </button>
+
+        <button id="btn-history-play" class="w-8 h-8 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white rounded-lg flex items-center justify-center text-xs font-bold transition-all shadow-md active:scale-95" title="Auto-Play Commit Timeline">
+          <i id="play-icon" class="fa-solid fa-play text-[11px]"></i>
+        </button>
+
+        <button id="btn-history-next" class="w-7 h-7 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 rounded-lg flex items-center justify-center text-xs transition-all active:scale-90" title="Step Forward (Newer Commit)">
+          <i class="fa-solid fa-forward-step"></i>
+        </button>
+
+        <!-- Range Scrubber -->
+        <div class="flex-1 relative flex items-center">
+          <input 
+            type="range" 
+            id="history-slider" 
+            min="0" 
+            max="4" 
+            value="0" 
+            step="1"
+            class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500 hover:accent-amber-400 transition-all"
+          />
+        </div>
+
+        <!-- Step indicator -->
+        <span id="history-step-indicator" class="font-mono text-xs font-semibold text-amber-400 flex-shrink-0">
+          1 / 5
+        </span>
+      </div>
+
+      <!-- Thermal Legend & Touch info -->
+      <div class="flex items-center justify-between text-[10px] text-slate-400 px-1 pt-0.5">
+        <div class="flex items-center gap-2">
+          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50"></span> Hotspot (Modified)</span>
+          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500/80"></span> Recent</span>
+          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-slate-700 opacity-50"></span> Cooled</span>
+        </div>
+        <span id="timetravel-files-count" class="font-mono text-amber-300/90">0 files touched</span>
+      </div>
     </div>
 
     <!-- Floating Graph Legend -->
@@ -436,7 +505,20 @@
     let activePulseNodeId = null;
     let pulseInterval = null;
     let currentlySelectedNodeId = null;
+
+    // Visual Feature 1: Blast Radius Particle Wave State
     let isBlastModeActive = false;
+    let blastTargetNodeId = null;
+    let blastAffectedNodes = [];
+    let blastAnimationId = null;
+    let blastStartTime = 0;
+
+    // Visual Feature 2: Git History Time Travel Scrubber State
+    let gitCommits = [];
+    let currentCommitIndex = 0;
+    let isTimeTravelAutoPlaying = false;
+    let timeTravelPlayTimer = null;
+    let isTimeTravelActive = false;
 
     // Toast Notification System
     function showToast(message, isError = false) {
@@ -534,6 +616,10 @@
         const badge = document.getElementById('active-repo-badge');
         if (badge) badge.textContent = result.repo_name;
         input.value = '';
+
+        if (isTimeTravelActive) {
+          closeTimeTravelDock();
+        }
 
         initNetwork(result);
         resetInspector();
@@ -728,22 +814,116 @@
       }
 
       network = new vis.Network(container, { nodes: nodesDataSet, edges: edgesDataSet }, options);
-      console.log("Network initialized successfully", network);
+
+      // Canvas Rendering Hook: Animated Blast Radius Particle Wave & Pulsating Auras
+      network.on("afterDrawing", function (ctx) {
+        if (!isBlastModeActive || !blastTargetNodeId || !network) return;
+
+        const t = (performance.now() - blastStartTime) / 1000;
+        const allBlastNodes = [blastTargetNodeId, ...blastAffectedNodes];
+        const positions = network.getPositions(allBlastNodes);
+
+        // 1. Draw pulsating resonant glowing auras on affected nodes
+        allBlastNodes.forEach((nodeId, idx) => {
+          const pos = positions[nodeId];
+          if (!pos) return;
+
+          const isTarget = nodeId === blastTargetNodeId;
+          const phaseOffset = isTarget ? 0 : (idx * 0.45);
+          const baseColor = isTarget ? '#f43f5e' : '#fb923c';
+          const rgbaBase = isTarget ? 'rgba(244, 63, 94, ' : 'rgba(251, 146, 60, ';
+
+          // Resonant inner aura ring
+          const pulseR = (isTarget ? 30 : 25) + 4.5 * Math.sin(t * (isTarget ? 4 : 3.5) + phaseOffset);
+          const auraAlpha = 0.55 + 0.35 * Math.sin(t * (isTarget ? 4 : 3.5) + phaseOffset);
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, pulseR, 0, 2 * Math.PI);
+          ctx.strokeStyle = rgbaBase + auraAlpha + ')';
+          ctx.lineWidth = isTarget ? 3.5 : 2.5;
+          ctx.shadowColor = baseColor;
+          ctx.shadowBlur = isTarget ? 22 : 15;
+          ctx.stroke();
+
+          // Expanding shockwave aura wave
+          const wavePhase = ((t * (isTarget ? 1.3 : 1.1)) + phaseOffset) % 1.0;
+          const waveR = (isTarget ? 24 : 20) + wavePhase * (isTarget ? 35 : 28);
+          const waveAlpha = (1 - wavePhase) * (isTarget ? 0.75 : 0.6);
+
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, waveR, 0, 2 * Math.PI);
+          ctx.strokeStyle = rgbaBase + waveAlpha + ')';
+          ctx.lineWidth = 1.8;
+          ctx.stroke();
+          ctx.restore();
+        });
+
+        // 2. Animate glowing plasma particle pulses traveling along connecting edges
+        if (rawGraphData && rawGraphData.edges) {
+          const relevantEdges = rawGraphData.edges.filter(e => 
+            (e.from === blastTargetNodeId || blastAffectedNodes.includes(e.from)) &&
+            (e.to === blastTargetNodeId || blastAffectedNodes.includes(e.to))
+          );
+
+          relevantEdges.forEach(edge => {
+            const p1 = positions[edge.from] || network.getPosition(edge.from);
+            const p2 = positions[edge.to] || network.getPosition(edge.to);
+            if (!p1 || !p2) return;
+
+            // Render 3 traveling plasma particles with staggered phases
+            for (let pIdx = 0; pIdx < 3; pIdx++) {
+              const progress = ((t * 0.95) + (pIdx / 3.0)) % 1.0;
+              const px = p1.x + (p2.x - p1.x) * progress;
+              const py = p1.y + (p2.y - p1.y) * progress;
+
+              ctx.save();
+
+              // Particle tail
+              const tailProg = Math.max(0, progress - 0.06);
+              const tx = p1.x + (p2.x - p1.x) * tailProg;
+              const ty = p1.y + (p2.y - p1.y) * tailProg;
+
+              ctx.beginPath();
+              ctx.moveTo(tx, ty);
+              ctx.lineTo(px, py);
+              ctx.strokeStyle = 'rgba(251, 146, 60, 0.75)';
+              ctx.lineWidth = 3.5;
+              ctx.lineCap = 'round';
+              ctx.stroke();
+
+              // Plasma glowing orb
+              ctx.beginPath();
+              ctx.arc(px, py, 4.5, 0, 2 * Math.PI);
+              ctx.fillStyle = '#ffedd5';
+              ctx.shadowColor = '#f97316';
+              ctx.shadowBlur = 14;
+              ctx.fill();
+
+              // Core hot nucleus
+              ctx.beginPath();
+              ctx.arc(px, py, 2.2, 0, 2 * Math.PI);
+              ctx.fillStyle = '#ffffff';
+              ctx.fill();
+
+              ctx.restore();
+            }
+          });
+        }
+      });
 
       network.on("selectNode", function (params) {
-        console.log("Selected node:", params.nodes);
         if (params.nodes && params.nodes.length > 0) {
           openModuleInspector(params.nodes[0]);
         }
       });
 
       network.on("click", function (params) {
-        console.log("Canvas clicked:", params);
         if (params.nodes && params.nodes.length > 0) {
           openModuleInspector(params.nodes[0]);
         } else {
           clearPulse();
-          if (!isBlastModeActive) {
+          if (!isBlastModeActive && !isTimeTravelActive) {
             resetInspector();
           }
         }
@@ -755,7 +935,6 @@
 
     // Open Module Inspector Drawer and Populate Details
     async function openModuleInspector(nodeId, matchReason = null) {
-      console.log("Opening inspector for:", nodeId);
       currentlySelectedNodeId = nodeId;
       clearPulse();
 
@@ -1007,10 +1186,53 @@
       }
     }
 
-    // Simulate Blast Radius with Graph Dimming
+    // Visual Feature 1: Start Animated Blast Radius Particle Wave
+    function startBlastParticleWave(targetNodeId, affectedNodes) {
+      isBlastModeActive = true;
+      blastTargetNodeId = targetNodeId;
+      blastAffectedNodes = affectedNodes || [];
+      blastStartTime = performance.now();
+
+      if (blastAnimationId) {
+        cancelAnimationFrame(blastAnimationId);
+      }
+
+      function animLoop() {
+        if (!isBlastModeActive) {
+          if (network) network.redraw();
+          return;
+        }
+        if (network) {
+          network.redraw();
+        }
+        blastAnimationId = requestAnimationFrame(animLoop);
+      }
+      blastAnimationId = requestAnimationFrame(animLoop);
+    }
+
+    // Stop Blast Radius Particle Wave
+    function stopBlastParticleWave() {
+      isBlastModeActive = false;
+      blastTargetNodeId = null;
+      blastAffectedNodes = [];
+      if (blastAnimationId) {
+        cancelAnimationFrame(blastAnimationId);
+        blastAnimationId = null;
+      }
+      if (network) {
+        network.redraw();
+      }
+    }
+
+    // Simulate Blast Radius with Graph Dimming & Particle Wave
     async function simulateBlastRadius(targetNodeId) {
       if (!rawGraphData) return;
-      isBlastModeActive = true;
+      
+      // If time travel dock is active, close it
+      if (isTimeTravelActive) {
+        closeTimeTravelDock();
+      }
+
       clearPulse();
 
       const blastResult = await fetchBlastRadiusApi(targetNodeId);
@@ -1142,7 +1364,11 @@
             arrows: { to: { enabled: true, scaleFactor: 0.3 } }
           });
         }
+      });
       edgesDataSet.update(edgeUpdates);
+
+      // Start the animated glowing particle pulses
+      startBlastParticleWave(targetNodeId, affectedNodes);
 
       if (network) {
         const focusIds = [targetNodeId, ...affectedNodes];
@@ -1155,7 +1381,7 @@
 
     // Reset Graph View & Colors
     function resetGraphView() {
-      isBlastModeActive = false;
+      stopBlastParticleWave();
       clearPulse();
 
       const banner = document.getElementById('blast-status-banner');
@@ -1167,6 +1393,273 @@
 
       if (network) {
         network.fit({ animation: { duration: 500 } });
+      }
+    }
+
+    // Visual Feature 2: Git History Time-Travel Scrubber Engine
+    async function loadGitHistory() {
+      try {
+        const response = await fetch('/api/git-history');
+        if (!response.ok) throw new Error("API status " + response.status);
+        const data = await response.json();
+        gitCommits = data.commits || [];
+        return gitCommits;
+      } catch (err) {
+        console.warn("Failed to load git history:", err);
+        return [];
+      }
+    }
+
+    // Open Time-Travel Playback Dock
+    async function openTimeTravelDock() {
+      if (isBlastModeActive) {
+        resetGraphView();
+      }
+
+      isTimeTravelActive = true;
+      const dock = document.getElementById('timetravel-dock');
+      const btnToggle = document.getElementById('btn-toggle-timetravel');
+
+      if (dock) dock.classList.remove('hidden');
+      if (btnToggle) {
+        btnToggle.classList.add('bg-amber-500/20', 'border-amber-500/60', 'text-amber-200');
+      }
+
+      showToast("Loading Git History Timeline...");
+      const commits = await loadGitHistory();
+
+      if (!commits || commits.length === 0) {
+        showToast("No commit history available", true);
+        return;
+      }
+
+      const slider = document.getElementById('history-slider');
+      if (slider) {
+        slider.min = 0;
+        slider.max = commits.length - 1;
+        slider.value = 0;
+      }
+
+      currentCommitIndex = 0;
+      applyCommitCheckpoint(0);
+      showToast(`Time-Travel active: ${commits.length} commits loaded`);
+    }
+
+    // Close Time-Travel Playback Dock
+    function closeTimeTravelDock() {
+      isTimeTravelActive = false;
+      stopTimeTravelAutoPlay();
+
+      const dock = document.getElementById('timetravel-dock');
+      const btnToggle = document.getElementById('btn-toggle-timetravel');
+
+      if (dock) dock.classList.add('hidden');
+      if (btnToggle) {
+        btnToggle.classList.remove('bg-amber-500/20', 'border-amber-500/60', 'text-amber-200');
+      }
+
+      if (rawGraphData) {
+        initNetwork(rawGraphData);
+      }
+      showToast("Time-Travel closed");
+    }
+
+    // Toggle Time-Travel Dock
+    function toggleTimeTravelDock() {
+      const dock = document.getElementById('timetravel-dock');
+      if (dock && !dock.classList.contains('hidden')) {
+        closeTimeTravelDock();
+      } else {
+        openTimeTravelDock();
+      }
+    }
+
+    // Apply specific commit checkpoint (Thermal Heatmap Rendering)
+    function applyCommitCheckpoint(index) {
+      if (!gitCommits || gitCommits.length === 0) return;
+      if (index < 0 || index >= gitCommits.length) return;
+
+      currentCommitIndex = index;
+      const commit = gitCommits[index];
+
+      const hashBadge = document.getElementById('commit-badge-hash');
+      const msgBadge = document.getElementById('commit-badge-msg');
+      const dateBadge = document.getElementById('commit-badge-date');
+      const stepIndicator = document.getElementById('history-step-indicator');
+      const slider = document.getElementById('history-slider');
+      const filesCountEl = document.getElementById('timetravel-files-count');
+
+      if (hashBadge) hashBadge.textContent = commit.short_hash || commit.hash?.slice(0, 7) || `#${index+1}`;
+      if (msgBadge) {
+        msgBadge.textContent = commit.summary;
+        msgBadge.title = commit.summary;
+      }
+      if (dateBadge) dateBadge.textContent = commit.date || '--';
+      if (stepIndicator) stepIndicator.textContent = `${index + 1} / ${gitCommits.length}`;
+      if (slider) slider.value = index;
+
+      const modifiedFiles = commit.modified_files || [];
+      const hotspotSet = new Set(modifiedFiles);
+
+      // Adjacent recent files
+      const adjacentSet = new Set();
+      if (index > 0 && gitCommits[index - 1]) {
+        (gitCommits[index - 1].modified_files || []).forEach(f => {
+          if (!hotspotSet.has(f)) adjacentSet.add(f);
+        });
+      }
+      if (index < gitCommits.length - 1 && gitCommits[index + 1]) {
+        (gitCommits[index + 1].modified_files || []).forEach(f => {
+          if (!hotspotSet.has(f)) adjacentSet.add(f);
+        });
+      }
+
+      if (filesCountEl) {
+        filesCountEl.textContent = `${hotspotSet.size} module(s) modified`;
+      }
+
+      if (!nodesDataSet) return;
+
+      // Update graph nodes with Thermal Heatmap styling
+      const nodeUpdates = [];
+      const matchedNodeIds = [];
+
+      nodesDataSet.forEach(node => {
+        const id = node.id;
+        const isHotspot = hotspotSet.has(id) || hotspotSet.has(node.label);
+        const isRecent = adjacentSet.has(id) || adjacentSet.has(node.label);
+        const baseSize = 22;
+
+        if (isHotspot) {
+          matchedNodeIds.push(id);
+          nodeUpdates.push({
+            id: id,
+            size: baseSize + 6,
+            borderWidth: 4,
+            color: {
+              background: '#450a0a', // Bright Thermal Crimson Hotspot
+              border: '#f43f5e',
+              highlight: { background: '#5f1010', border: '#fb7185' }
+            },
+            shadow: {
+              enabled: true,
+              color: 'rgba(244, 63, 94, 0.95)',
+              size: 24,
+              x: 0,
+              y: 0
+            },
+            font: {
+              face: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+              size: 13,
+              color: '#ffffff',
+              strokeWidth: 0,
+              background: 'rgba(15, 23, 42, 0.95)',
+              strokeColor: '#f43f5e',
+              margin: 6
+            }
+          });
+        } else if (isRecent) {
+          nodeUpdates.push({
+            id: id,
+            size: baseSize + 2,
+            borderWidth: 3,
+            color: {
+              background: '#3d1f05', // Warm Amber
+              border: '#fb923c',
+              highlight: { background: '#542a07', border: '#fdba74' }
+            },
+            shadow: {
+              enabled: true,
+              color: 'rgba(251, 146, 60, 0.65)',
+              size: 14,
+              x: 0,
+              y: 0
+            },
+            font: {
+              face: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+              size: 11,
+              color: '#fed7aa',
+              strokeWidth: 0,
+              background: 'rgba(15, 23, 42, 0.85)',
+              strokeColor: '#fb923c',
+              margin: 5
+            }
+          });
+        } else {
+          // Untouched files cool down to translucent blue
+          nodeUpdates.push({
+            id: id,
+            size: 14,
+            borderWidth: 1,
+            color: {
+              background: 'rgba(13, 21, 39, 0.25)',
+              border: 'rgba(56, 189, 248, 0.2)',
+              highlight: { background: 'rgba(30, 41, 59, 0.4)', border: '#38bdf8' }
+            },
+            shadow: { enabled: false },
+            font: {
+              face: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+              size: 10,
+              color: '#475569',
+              strokeWidth: 0,
+              background: 'rgba(15, 23, 42, 0.3)',
+              strokeColor: 'transparent',
+              margin: 4
+            }
+          });
+        }
+      });
+
+      nodesDataSet.update(nodeUpdates);
+
+      if (matchedNodeIds.length > 0 && network) {
+        network.fit({
+          nodes: matchedNodeIds,
+          animation: { duration: 450, easingFunction: 'easeInOutQuad' }
+        });
+      }
+    }
+
+    // Step through commit history
+    function stepCommitHistory(delta) {
+      if (!gitCommits || gitCommits.length === 0) return;
+      let nextIndex = currentCommitIndex + delta;
+      if (nextIndex < 0) nextIndex = gitCommits.length - 1;
+      if (nextIndex >= gitCommits.length) nextIndex = 0;
+      applyCommitCheckpoint(nextIndex);
+    }
+
+    // Toggle Auto-Play timeline
+    function toggleTimeTravelAutoPlay() {
+      if (isTimeTravelAutoPlaying) {
+        stopTimeTravelAutoPlay();
+      } else {
+        startTimeTravelAutoPlay();
+      }
+    }
+
+    function startTimeTravelAutoPlay() {
+      if (!gitCommits || gitCommits.length === 0) return;
+      isTimeTravelAutoPlaying = true;
+      const playIcon = document.getElementById('play-icon');
+      if (playIcon) playIcon.className = 'fa-solid fa-pause text-[11px]';
+
+      showToast("Auto-playing git commit timeline...");
+      if (timeTravelPlayTimer) clearInterval(timeTravelPlayTimer);
+
+      timeTravelPlayTimer = setInterval(() => {
+        const nextIndex = (currentCommitIndex + 1) % gitCommits.length;
+        applyCommitCheckpoint(nextIndex);
+      }, 1900);
+    }
+
+    function stopTimeTravelAutoPlay() {
+      isTimeTravelAutoPlaying = false;
+      const playIcon = document.getElementById('play-icon');
+      if (playIcon) playIcon.className = 'fa-solid fa-play text-[11px]';
+      if (timeTravelPlayTimer) {
+        clearInterval(timeTravelPlayTimer);
+        timeTravelPlayTimer = null;
       }
     }
 
@@ -1229,6 +1722,40 @@
         });
       }
 
+      // Time Travel Toggle Header Button
+      const btnToggleTimeTravel = document.getElementById('btn-toggle-timetravel');
+      if (btnToggleTimeTravel) {
+        btnToggleTimeTravel.addEventListener('click', toggleTimeTravelDock);
+      }
+
+      // Time Travel Dock Controls
+      const btnCloseTimeTravel = document.getElementById('btn-close-timetravel');
+      if (btnCloseTimeTravel) {
+        btnCloseTimeTravel.addEventListener('click', closeTimeTravelDock);
+      }
+
+      const btnHistoryPrev = document.getElementById('btn-history-prev');
+      if (btnHistoryPrev) {
+        btnHistoryPrev.addEventListener('click', () => stepCommitHistory(-1));
+      }
+
+      const btnHistoryNext = document.getElementById('btn-history-next');
+      if (btnHistoryNext) {
+        btnHistoryNext.addEventListener('click', () => stepCommitHistory(1));
+      }
+
+      const btnHistoryPlay = document.getElementById('btn-history-play');
+      if (btnHistoryPlay) {
+        btnHistoryPlay.addEventListener('click', toggleTimeTravelAutoPlay);
+      }
+
+      const historySlider = document.getElementById('history-slider');
+      if (historySlider) {
+        historySlider.addEventListener('input', (e) => {
+          applyCommitCheckpoint(parseInt(e.target.value, 10));
+        });
+      }
+
       // Toggle Tests
       const btnToggleTests = document.getElementById('toggle-tests');
       if (btnToggleTests) {
@@ -1267,6 +1794,9 @@
       const btnReset = document.getElementById('btn-reset');
       if (btnReset) {
         btnReset.addEventListener('click', () => {
+          if (isTimeTravelActive) {
+            closeTimeTravelDock();
+          }
           resetGraphView();
           resetInspector();
         });

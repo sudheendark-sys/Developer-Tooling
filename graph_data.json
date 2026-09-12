@@ -1,17 +1,16 @@
 {
   "nodes": [
     {
-      "id": "app.py",
-      "label": "app.py",
-      "rel_path": "app.py",
+      "id": "doc/conf.py",
+      "label": "conf.py",
+      "rel_path": "doc/conf.py",
       "is_test": false,
       "color": "#3b82f6",
       "incoming_count": 0,
-      "outgoing_count": 2,
+      "outgoing_count": 1,
       "incoming_dependencies": [],
       "outgoing_dependencies": [
-        "auth.py",
-        "database.py"
+        "pafy/pafy.py"
       ],
       "size": 22,
       "font": {
@@ -21,18 +20,43 @@
       }
     },
     {
-      "id": "auth.py",
-      "label": "auth.py",
-      "rel_path": "auth.py",
+      "id": "pafy/__init__.py",
+      "label": "__init__.py",
+      "rel_path": "pafy/__init__.py",
+      "is_test": false,
+      "color": "#3b82f6",
+      "incoming_count": 0,
+      "outgoing_count": 4,
+      "incoming_dependencies": [],
+      "outgoing_dependencies": [
+        "pafy/channel.py",
+        "pafy/pafy.py",
+        "pafy/playlist.py",
+        "pafy/util.py"
+      ],
+      "size": 22,
+      "font": {
+        "color": "#f8fafc",
+        "size": 14,
+        "face": "Inter, system-ui, sans-serif"
+      }
+    },
+    {
+      "id": "pafy/backend_internal.py",
+      "label": "backend_internal.py",
+      "rel_path": "pafy/backend_internal.py",
       "is_test": false,
       "color": "#3b82f6",
       "incoming_count": 1,
-      "outgoing_count": 1,
+      "outgoing_count": 4,
       "incoming_dependencies": [
-        "app.py"
+        "pafy/pafy.py"
       ],
       "outgoing_dependencies": [
-        "database.py"
+        "pafy/backend_shared.py",
+        "pafy/g.py",
+        "pafy/jsinterp.py",
+        "pafy/pafy.py"
       ],
       "size": 27,
       "font": {
@@ -42,19 +66,229 @@
       }
     },
     {
-      "id": "database.py",
-      "label": "database.py",
-      "rel_path": "database.py",
+      "id": "pafy/backend_shared.py",
+      "label": "backend_shared.py",
+      "rel_path": "pafy/backend_shared.py",
       "is_test": false,
       "color": "#ef4444",
-      "incoming_count": 2,
+      "incoming_count": 3,
+      "outgoing_count": 4,
+      "incoming_dependencies": [
+        "pafy/backend_internal.py",
+        "pafy/backend_youtube_dl.py",
+        "pafy/channel.py"
+      ],
+      "outgoing_dependencies": [
+        "pafy/g.py",
+        "pafy/pafy.py",
+        "pafy/playlist.py",
+        "pafy/util.py"
+      ],
+      "size": 39,
+      "font": {
+        "color": "#f8fafc",
+        "size": 14,
+        "face": "Inter, system-ui, sans-serif"
+      }
+    },
+    {
+      "id": "pafy/backend_youtube_dl.py",
+      "label": "backend_youtube_dl.py",
+      "rel_path": "pafy/backend_youtube_dl.py",
+      "is_test": false,
+      "color": "#3b82f6",
+      "incoming_count": 1,
+      "outgoing_count": 2,
+      "incoming_dependencies": [
+        "pafy/pafy.py"
+      ],
+      "outgoing_dependencies": [
+        "pafy/backend_shared.py",
+        "pafy/g.py"
+      ],
+      "size": 27,
+      "font": {
+        "color": "#f8fafc",
+        "size": 14,
+        "face": "Inter, system-ui, sans-serif"
+      }
+    },
+    {
+      "id": "pafy/channel.py",
+      "label": "channel.py",
+      "rel_path": "pafy/channel.py",
+      "is_test": false,
+      "color": "#3b82f6",
+      "incoming_count": 1,
+      "outgoing_count": 3,
+      "incoming_dependencies": [
+        "pafy/__init__.py"
+      ],
+      "outgoing_dependencies": [
+        "pafy/backend_shared.py",
+        "pafy/pafy.py",
+        "pafy/playlist.py"
+      ],
+      "size": 27,
+      "font": {
+        "color": "#f8fafc",
+        "size": 14,
+        "face": "Inter, system-ui, sans-serif"
+      }
+    },
+    {
+      "id": "pafy/g.py",
+      "label": "g.py",
+      "rel_path": "pafy/g.py",
+      "is_test": false,
+      "color": "#ef4444",
+      "incoming_count": 6,
       "outgoing_count": 0,
       "incoming_dependencies": [
-        "app.py",
-        "auth.py"
+        "pafy/backend_internal.py",
+        "pafy/backend_shared.py",
+        "pafy/backend_youtube_dl.py",
+        "pafy/pafy.py",
+        "pafy/playlist.py",
+        "pafy/util.py"
       ],
       "outgoing_dependencies": [],
-      "size": 34,
+      "size": 54,
+      "font": {
+        "color": "#f8fafc",
+        "size": 14,
+        "face": "Inter, system-ui, sans-serif"
+      }
+    },
+    {
+      "id": "pafy/jsinterp.py",
+      "label": "jsinterp.py",
+      "rel_path": "pafy/jsinterp.py",
+      "is_test": false,
+      "color": "#3b82f6",
+      "incoming_count": 1,
+      "outgoing_count": 0,
+      "incoming_dependencies": [
+        "pafy/backend_internal.py"
+      ],
+      "outgoing_dependencies": [],
+      "size": 27,
+      "font": {
+        "color": "#f8fafc",
+        "size": 14,
+        "face": "Inter, system-ui, sans-serif"
+      }
+    },
+    {
+      "id": "pafy/pafy.py",
+      "label": "pafy.py",
+      "rel_path": "pafy/pafy.py",
+      "is_test": false,
+      "color": "#ef4444",
+      "incoming_count": 8,
+      "outgoing_count": 4,
+      "incoming_dependencies": [
+        "doc/conf.py",
+        "pafy/__init__.py",
+        "pafy/backend_internal.py",
+        "pafy/backend_shared.py",
+        "pafy/channel.py",
+        "pafy/playlist.py",
+        "setup.py",
+        "tests/test.py"
+      ],
+      "outgoing_dependencies": [
+        "pafy/backend_internal.py",
+        "pafy/backend_youtube_dl.py",
+        "pafy/g.py",
+        "pafy/util.py"
+      ],
+      "size": 58,
+      "font": {
+        "color": "#f8fafc",
+        "size": 14,
+        "face": "Inter, system-ui, sans-serif"
+      }
+    },
+    {
+      "id": "pafy/playlist.py",
+      "label": "playlist.py",
+      "rel_path": "pafy/playlist.py",
+      "is_test": false,
+      "color": "#ef4444",
+      "incoming_count": 3,
+      "outgoing_count": 2,
+      "incoming_dependencies": [
+        "pafy/__init__.py",
+        "pafy/backend_shared.py",
+        "pafy/channel.py"
+      ],
+      "outgoing_dependencies": [
+        "pafy/g.py",
+        "pafy/pafy.py"
+      ],
+      "size": 39,
+      "font": {
+        "color": "#f8fafc",
+        "size": 14,
+        "face": "Inter, system-ui, sans-serif"
+      }
+    },
+    {
+      "id": "pafy/util.py",
+      "label": "util.py",
+      "rel_path": "pafy/util.py",
+      "is_test": false,
+      "color": "#ef4444",
+      "incoming_count": 3,
+      "outgoing_count": 1,
+      "incoming_dependencies": [
+        "pafy/__init__.py",
+        "pafy/backend_shared.py",
+        "pafy/pafy.py"
+      ],
+      "outgoing_dependencies": [
+        "pafy/g.py"
+      ],
+      "size": 39,
+      "font": {
+        "color": "#f8fafc",
+        "size": 14,
+        "face": "Inter, system-ui, sans-serif"
+      }
+    },
+    {
+      "id": "setup.py",
+      "label": "setup.py",
+      "rel_path": "setup.py",
+      "is_test": false,
+      "color": "#3b82f6",
+      "incoming_count": 0,
+      "outgoing_count": 1,
+      "incoming_dependencies": [],
+      "outgoing_dependencies": [
+        "pafy/pafy.py"
+      ],
+      "size": 22,
+      "font": {
+        "color": "#f8fafc",
+        "size": 14,
+        "face": "Inter, system-ui, sans-serif"
+      }
+    },
+    {
+      "id": "tests/test.py",
+      "label": "test.py",
+      "rel_path": "tests/test.py",
+      "is_test": true,
+      "color": "#3b82f6",
+      "incoming_count": 0,
+      "outgoing_count": 1,
+      "incoming_dependencies": [],
+      "outgoing_dependencies": [
+        "pafy/pafy.py"
+      ],
+      "size": 22,
       "font": {
         "color": "#f8fafc",
         "size": 14,
@@ -64,27 +298,147 @@
   ],
   "edges": [
     {
-      "from": "app.py",
-      "to": "auth.py",
+      "from": "doc/conf.py",
+      "to": "pafy/pafy.py",
       "arrows": "to"
     },
     {
-      "from": "app.py",
-      "to": "database.py",
+      "from": "pafy/__init__.py",
+      "to": "pafy/channel.py",
       "arrows": "to"
     },
     {
-      "from": "auth.py",
-      "to": "database.py",
+      "from": "pafy/__init__.py",
+      "to": "pafy/pafy.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/__init__.py",
+      "to": "pafy/playlist.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/__init__.py",
+      "to": "pafy/util.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/backend_internal.py",
+      "to": "pafy/backend_shared.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/backend_internal.py",
+      "to": "pafy/g.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/backend_internal.py",
+      "to": "pafy/jsinterp.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/backend_internal.py",
+      "to": "pafy/pafy.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/backend_shared.py",
+      "to": "pafy/g.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/backend_shared.py",
+      "to": "pafy/pafy.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/backend_shared.py",
+      "to": "pafy/playlist.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/backend_shared.py",
+      "to": "pafy/util.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/backend_youtube_dl.py",
+      "to": "pafy/backend_shared.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/backend_youtube_dl.py",
+      "to": "pafy/g.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/channel.py",
+      "to": "pafy/backend_shared.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/channel.py",
+      "to": "pafy/pafy.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/channel.py",
+      "to": "pafy/playlist.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/pafy.py",
+      "to": "pafy/backend_internal.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/pafy.py",
+      "to": "pafy/backend_youtube_dl.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/pafy.py",
+      "to": "pafy/g.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/pafy.py",
+      "to": "pafy/util.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/playlist.py",
+      "to": "pafy/g.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/playlist.py",
+      "to": "pafy/pafy.py",
+      "arrows": "to"
+    },
+    {
+      "from": "pafy/util.py",
+      "to": "pafy/g.py",
+      "arrows": "to"
+    },
+    {
+      "from": "setup.py",
+      "to": "pafy/pafy.py",
+      "arrows": "to"
+    },
+    {
+      "from": "tests/test.py",
+      "to": "pafy/pafy.py",
       "arrows": "to"
     }
   ],
-  "total_files": 3,
-  "total_connections": 3,
-  "critical_hubs": 1,
+  "total_files": 13,
+  "total_connections": 27,
+  "critical_hubs": 5,
   "stats": {
-    "total_files": 3,
-    "total_connections": 3,
-    "critical_hubs": 1
+    "total_files": 13,
+    "total_connections": 27,
+    "critical_hubs": 5
   }
 }
