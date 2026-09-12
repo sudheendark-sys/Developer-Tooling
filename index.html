@@ -162,7 +162,7 @@
           </div>
           <input 
             type="text" 
-            id="search-query" 
+            id="search-input" 
             placeholder="Ask codebase: e.g. where is db or auth handled?..."
             class="w-full h-9 pl-9 pr-24 bg-slate-950/70 border border-slate-700/60 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all shadow-inner"
             autocomplete="off"
@@ -589,7 +589,7 @@
     window.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        const searchInput = document.getElementById('search-query');
+        const searchInput = document.getElementById('search-input') || document.getElementById('search-query') || document.querySelector("input[placeholder*='Ask codebase']");
         if (searchInput) {
           searchInput.focus();
           searchInput.select();
@@ -1853,34 +1853,83 @@
       }
     }
 
-    // Handle Natural-Language Architecture Search
-    async function handleArchitectureSearch() {
-      const input = document.getElementById('search-query');
-      const query = input.value.trim();
-      if (!query) return;
+    // Robust Node Search & Partial/Fuzzy Matching
+    async function executeNodeSearch() {
+      const searchInput = document.getElementById("search-input") || document.getElementById("search-query") || document.querySelector("input[placeholder*='Ask codebase']");
+      if (!searchInput) return;
 
-      showToast(`Searching architecture for "${query}"...`);
-      const result = await queryArchitectureApi(query);
+      const rawQuery = searchInput.value.trim().toLowerCase();
+      if (!rawQuery) return;
 
-      if (!result || !result.target_node) {
-        showToast(`No matching module found for "${query}"`, true);
-        return;
-      }
+      // Strip common query prefixes if users type "where is db" or "find auth"
+      const query = rawQuery.replace(/^(where is|find|show me|locate|ask codebase|where's)\s+/i, "").trim();
 
-      const targetId = result.target_node;
-      currentlySelectedNodeId = targetId;
+      const allNodes = (nodesDataSet ? nodesDataSet.get() : []) || [];
+      
+      // 1. Match by exact id, label, or stem
+      let match = allNodes.find(n => {
+        const label = (n.label || "").toLowerCase();
+        const id = (n.id || "").toLowerCase();
+        const cleanQuery = query.replace(/\.py$/, '');
+        return label === query || id === query || label.replace(/\.py$/, '') === cleanQuery || id.replace(/\.py$/, '') === cleanQuery;
+      });
 
-      if (network) {
-        network.selectNodes([targetId]);
-        network.focus(targetId, {
-          scale: 1.4,
-          animation: { duration: 750, easingFunction: 'easeInOutQuad' }
+      // 2. Match by label or id substring
+      if (!match) {
+        match = allNodes.find(n => {
+          const label = (n.label || "").toLowerCase();
+          const id = (n.id || "").toLowerCase();
+          return label.includes(query) || id.includes(query);
         });
       }
 
-      highlightAndPulseNode(targetId);
-      await openModuleInspector(targetId, result.reason);
+      // 3. Fallback to API query ranking if no direct substring match
+      let matchReason = `Matched query '${query}'`;
+      if (!match) {
+        try {
+          const apiResult = await queryArchitectureApi(rawQuery);
+          if (apiResult && apiResult.target_node) {
+            match = allNodes.find(n => n.id === apiResult.target_node || n.label === apiResult.target_node);
+            if (apiResult.reason) matchReason = apiResult.reason;
+          }
+        } catch (e) {
+          console.warn("API query search fallback error:", e);
+        }
+      }
+
+      if (match) {
+        currentlySelectedNodeId = match.id;
+
+        // 1. Select the node in vis-network
+        if (network) {
+          network.selectNodes([match.id]);
+
+          // 2. Smoothly animate camera to center and zoom in
+          network.focus(match.id, {
+            scale: 1.25,
+            animation: {
+              duration: 700,
+              easingFunction: "easeInOutQuad"
+            }
+          });
+        }
+
+        highlightAndPulseNode(match.id);
+
+        // 3. Open Module Inspector for the found module
+        if (typeof openModuleInspector === "function") {
+          openModuleInspector(match.id, matchReason);
+        }
+        showToast(`Found module: ${match.label || match.id}`);
+      } else {
+        // Visual feedback for no match found
+        searchInput.classList.add("border-red-500", "ring-2", "ring-red-500/40");
+        setTimeout(() => searchInput.classList.remove("border-red-500", "ring-2", "ring-red-500/40"), 1500);
+        showToast(`No matching module found for "${rawQuery}"`, true);
+      }
     }
+
+    const handleArchitectureSearch = executeNodeSearch;
 
     // EVENT LISTENERS BINDING
     document.addEventListener('DOMContentLoaded', async () => {
@@ -1899,16 +1948,21 @@
         });
       }
 
-      // Search Button & Input Enter
+      // Search Button & Input Enter (Prevent page reload and execute robust search)
       const btnSearch = document.getElementById('btn-search');
-      const searchInput = document.getElementById('search-query');
-      if (btnSearch && searchInput) {
-        btnSearch.addEventListener('click', handleArchitectureSearch);
-        searchInput.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') {
+      const searchInput = document.getElementById("search-input") || document.getElementById("search-query") || document.querySelector("input[placeholder*='Ask codebase']");
+      if (searchInput) {
+        searchInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
             e.preventDefault();
-            handleArchitectureSearch();
+            executeNodeSearch();
           }
+        });
+      }
+      if (btnSearch) {
+        btnSearch.addEventListener('click', (e) => {
+          e.preventDefault();
+          executeNodeSearch();
         });
       }
 
