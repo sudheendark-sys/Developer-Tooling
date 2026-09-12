@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RepoNavigator | Ask the Architecture & Dependency Explorer</title>
+  <meta name="description" content="Interactive architecture visualizer and AI dependency explainer for RepoNavigator." />
+  
+  <!-- Google Fonts & Vis Network CDN -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #080c14;
+      --bg-surface: rgba(15, 23, 42, 0.85);
+      --bg-card: rgba(30, 41, 59, 0.65);
+      --border-color: rgba(148, 163, 184, 0.14);
+      --border-active: rgba(99, 102, 241, 0.5);
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-blue: #3b82f6;
+      --accent-red: #ef4444;
+      --accent-purple: #8b5cf6;
+      --accent-amber: #f59e0b;
+      --accent-emerald: #10b981;
+      --accent-neon: #22c55e;
+      --accent-cyan: #06b6d4;
+      --sidebar-width: 420px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at top left, #0f172a, #030712 85%);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Header Bar */
+    header {
+      height: 68px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      background: rgba(10, 15, 30, 0.9);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-color);
+      z-index: 20;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .logo-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, #6366f1, #3b82f6);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.45);
+    }
+
+    .logo-icon svg {
+      width: 20px;
+      height: 20px;
+      stroke: #fff;
+    }
+
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(90deg, #ffffff, #cbd5e1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-subtitle {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ai-badge {
+      background: linear-gradient(90deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.2));
+      border: 1px solid rgba(139, 92, 246, 0.35);
+      color: #c084fc;
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Ask the Architecture Search Bar */
+    .search-container {
+      flex: 1;
+      max-width: 600px;
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-input-wrapper {
+      width: 100%;
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 14px;
+      width: 16px;
+      height: 16px;
+      stroke: var(--text-secondary);
+      pointer-events: none;
+      transition: stroke 0.2s ease;
+    }
+
+    .search-input {
+      width: 100%;
+      height: 42px;
+      padding: 0 110px 0 40px;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 0.85rem;
+      font-family: inherit;
+      outline: none;
+      transition: all 0.2s ease;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .search-input::placeholder {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+
+    .search-input:focus {
+      background: rgba(15, 23, 42, 0.95);
+      border-color: rgba(99, 102, 241, 0.6);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .search-input:focus + .search-icon {
+      stroke: #818cf8;
+    }
+
+    .search-actions {
+      position: absolute;
+      right: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .shortcut-tag {
+      font-size: 0.68rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-muted);
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid var(--border-color);
+      padding: 2px 6px;
+      border-radius: 4px;
+      pointer-events: none;
+    }
+
+    .search-btn {
+      background: linear-gradient(135deg, #4f46e5, #3b82f6);
+      border: none;
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+    }
+
+    .search-btn:hover {
+      background: linear-gradient(135deg, #4338ca, #2563eb);
+      transform: translateY(-1px);
+    }
+
+    .search-btn:active {
+      transform: translateY(0);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 8px 13px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background: rgba(51, 65, 85, 0.8);
+      border-color: rgba(148, 163, 184, 0.3);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #4f46e5, #3b82f6);
+      border: none;
+      box-shadow: 0 2px 12px rgba(79, 70, 229, 0.35);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #4338ca, #2563eb);
+    }
+
+    /* Workspace Layout */
+    .main-container {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 68px);
+      position: relative;
+    }
+
+    /* Graph Canvas Area */
+    #graph-container {
+      flex: 1;
+      height: 100%;
+      background: radial-gradient(circle at center, rgba(30, 41, 59, 0.12) 0%, rgba(3, 7, 18, 0.9) 100%);
+      position: relative;
+      outline: none;
+    }
+
+    /* Floating Legend */
+    .canvas-legend {
+      position: absolute;
+      bottom: 24px;
+      left: 24px;
+      background: var(--bg-surface);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 14px 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      z-index: 10;
+      pointer-events: auto;
+      max-width: 290px;
+    }
+
+    .legend-title {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.8rem;
+      margin-bottom: 6px;
+      color: #e2e8f0;
+    }
+
+    .legend-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .legend-dot.red {
+      background: var(--accent-red);
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+    }
+
+    .legend-dot.blue {
+      background: var(--accent-blue);
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.6);
+    }
+
+    .legend-dot.neon {
+      background: var(--accent-neon);
+      box-shadow: 0 0 12px rgba(34, 197, 94, 0.8);
+    }
+
+    /* Floating Canvas Controls */
+    .canvas-controls {
+      position: absolute;
+      top: 24px;
+      left: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 10;
+    }
+
+    .control-btn {
+      width: 38px;
+      height: 38px;
+      background: var(--bg-surface);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    .control-btn:hover {
+      background: rgba(51, 65, 85, 0.9);
+      border-color: rgba(99, 102, 241, 0.5);
+      transform: scale(1.05);
+    }
+
+    /* Right Sidebar */
+    #sidebar {
+      width: var(--sidebar-width);
+      height: 100%;
+      background: var(--bg-surface);
+      backdrop-filter: blur(24px);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      box-shadow: -10px 0 35px rgba(0, 0, 0, 0.35);
+      z-index: 15;
+      overflow-y: auto;
+    }
+
+    .sidebar-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(15, 23, 42, 0.4);
+    }
+
+    .sidebar-header h2 {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #e2e8f0;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sidebar-content {
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      flex: 1;
+    }
+
+    /* Search Match Banner */
+    .search-match-banner {
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(16, 185, 129, 0.08));
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      box-shadow: 0 4px 14px rgba(34, 197, 94, 0.15);
+      animation: bannerSlideIn 0.3s ease-out;
+    }
+
+    @keyframes bannerSlideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .search-match-icon {
+      width: 18px;
+      height: 18px;
+      stroke: #4ade80;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .search-match-text {
+      font-size: 0.8rem;
+      line-height: 1.45;
+      color: #dcfce7;
+    }
+
+    .search-match-title {
+      font-weight: 700;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #4ade80;
+      margin-bottom: 2px;
+    }
+
+    /* Empty state */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+      height: 100%;
+    }
+
+    .empty-icon {
+      width: 60px;
+      height: 60px;
+      border-radius: 18px;
+      background: rgba(30, 41, 59, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+      border: 1px solid var(--border-color);
+    }
+
+    .empty-icon svg {
+      width: 30px;
+      height: 30px;
+      stroke: var(--text-secondary);
+    }
+
+    /* Loading Spinner */
+    .loading-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 50px 20px;
+      gap: 16px;
+      text-align: center;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(99, 102, 241, 0.2);
+      border-radius: 50%;
+      border-top-color: #6366f1;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Card Panels */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+      position: relative;
+    }
+
+    .file-header-card {
+      background: linear-gradient(180deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.7));
+      border: 1px solid rgba(148, 163, 184, 0.2);
+    }
+
+    .file-path {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+      word-break: break-all;
+    }
+
+    .file-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .file-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .risk-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .risk-low {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .risk-medium {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .risk-high, .risk-critical {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.15);
+    }
+
+    /* Risk Meter */
+    .risk-meter-container {
+      margin-top: 10px;
+    }
+
+    .risk-meter-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+
+    .meter-track {
+      height: 6px;
+      background: rgba(15, 23, 42, 0.8);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      display: flex;
+    }
+
+    .meter-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.4s ease;
+    }
+
+    .meter-fill.low { width: 20%; background: #10b981; }
+    .meter-fill.medium { width: 45%; background: #f59e0b; }
+    .meter-fill.high { width: 80%; background: #ef4444; }
+    .meter-fill.critical { width: 100%; background: #dc2626; }
+
+    /* AI Summary Box */
+    .ai-summary-box {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.04));
+      border: 1px solid rgba(99, 102, 241, 0.25);
+    }
+
+    .section-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      font-weight: 600;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .summary-text {
+      font-size: 0.88rem;
+      line-height: 1.55;
+      color: #e2e8f0;
+    }
+
+    .provider-tag {
+      font-size: 0.65rem;
+      color: #a5b4fc;
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* Blast Radius Callout */
+    .blast-radius-box {
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      border-left: 4px solid var(--accent-red);
+    }
+
+    .blast-radius-box.low-risk {
+      background: rgba(16, 185, 129, 0.06);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      border-left: 4px solid var(--accent-emerald);
+    }
+
+    .blast-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .blast-title.red { color: #f87171; }
+    .blast-title.green { color: #34d399; }
+
+    .blast-desc {
+      font-size: 0.82rem;
+      line-height: 1.5;
+      color: #cbd5e1;
+    }
+
+    /* Dependency Lists */
+    .dep-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .dep-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .dep-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      color: #e2e8f0;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .dep-item:hover {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: rgba(59, 130, 246, 0.4);
+      transform: translateX(3px);
+    }
+
+    .dep-arrow {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+
+    .no-deps {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-style: italic;
+      padding: 4px 0;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: #34d399;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      background: #10b981;
+      border-radius: 50%;
+      box-shadow: 0 0 6px #10b981;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header Bar -->
+  <header>
+    <div class="brand-section">
+      <div class="logo-icon">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      </div>
+      <div>
+        <h1 class="brand-title">RepoNavigator</h1>
+        <div class="brand-subtitle">
+          <span>Architecture Explorer</span>
+          <span class="ai-badge">AI Powered</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ask the Architecture Search Bar -->
+    <div class="search-container">
+      <div class="search-input-wrapper">
+        <svg class="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <input 
+          type="text" 
+          id="architecture-query-input" 
+          class="search-input" 
+          placeholder="Ask codebase: e.g. Where is database or login handled?..." 
+          autocomplete="off"
+        />
+        <div class="search-actions">
+          <span class="shortcut-tag" id="shortcut-hint">⌘K</span>
+          <button class="search-btn" id="btn-search-architecture">
+            <span>Find</span>
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn" id="btn-fit" title="Fit & Center View">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+        </svg>
+        Center
+      </button>
+      <button class="btn btn-primary" id="btn-reload" title="Refresh Graph from Server">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        Reload
+      </button>
+    </div>
+  </header>
+
+  <!-- Workspace -->
+  <div class="main-container">
+    <!-- Graph Viewport -->
+    <div id="graph-container">
+      <div class="canvas-controls">
+        <button class="control-btn" id="ctrl-zoom-in" title="Zoom In">+</button>
+        <button class="control-btn" id="ctrl-zoom-out" title="Zoom Out">−</button>
+        <button class="control-btn" id="ctrl-physics" title="Toggle Physics">⚡</button>
+      </div>
+
+      <div class="canvas-legend">
+        <div class="legend-title">Dependency Metrics</div>
+        <div class="legend-item">
+          <div class="legend-dot red"></div>
+          <span><strong>High Hub</strong> (≥ 2 Incoming Imports)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot blue"></div>
+          <span><strong>Standard Module</strong> (&lt; 2 Incoming)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot neon"></div>
+          <span><strong>Active / Focus Target</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inspector Sidebar -->
+    <aside id="sidebar">
+      <div class="sidebar-header">
+        <h2>
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#818cf8">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          Module Inspector
+        </h2>
+      </div>
+
+      <div class="sidebar-content" id="sidebar-content">
+        <div class="empty-state">
+          <div class="empty-icon">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+            </svg>
+          </div>
+          <p style="font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Select a Module or Ask a Question</p>
+          <p style="font-size: 0.8rem; line-height: 1.4;">Type a query like <em>"Where is database handled?"</em> in the search bar or click any node to inspect.</p>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    let network = null;
+    let nodesDataSet = null;
+    let edgesDataSet = null;
+    let graphData = null;
+    let physicsEnabled = true;
+    let activePulseNodeId = null;
+    let pulseInterval = null;
+
+    // Detect OS for shortcut hint
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const shortcutHint = document.getElementById('shortcut-hint');
+    if (shortcutHint) {
+      shortcutHint.textContent = isMac ? '⌘K' : 'Ctrl+K';
+    }
+
+    // Global keyboard shortcut (Cmd+K or Ctrl+K)
+    window.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        const searchInput = document.getElementById('architecture-query-input');
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        }
+      }
+    });
+
+    async function fetchGraphData() {
+      try {
+        const response = await fetch('/api/graph');
+        if (!response.ok) throw new Error("HTTP error " + response.status);
+        return await response.json();
+      } catch (err) {
+        console.warn("Falling back to graph_data.json:", err);
+        const fbResp = await fetch('graph_data.json?t=' + Date.now());
+        return await fbResp.json();
+      }
+    }
+
+    async function fetchAiExplanation(filename) {
+      try {
+        const response = await fetch('/api/explain', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: filename })
+        });
+        if (!response.ok) throw new Error("API status " + response.status);
+        return await response.json();
+      } catch (err) {
+        console.error("AI explain fetch failed:", err);
+        return null;
+      }
+    }
+
+    async function queryArchitectureApi(query) {
+      try {
+        const response = await fetch('/api/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: query })
+        });
+        if (!response.ok) throw new Error("Query API error " + response.status);
+        return await response.json();
+      } catch (err) {
+        console.error("Query failed:", err);
+        return null;
+      }
+    }
+
+    function initNetwork(data) {
+      graphData = data;
+      const container = document.getElementById('graph-container');
+
+      const formattedNodes = data.nodes.map(node => {
+        const isCritical = node.color === '#ef4444' || node.incoming_count >= 2;
+        return {
+          id: node.id,
+          label: node.label,
+          shape: 'dot',
+          size: node.size || (isCritical ? 38 : 28),
+          color: {
+            background: isCritical ? '#ef4444' : '#3b82f6',
+            border: isCritical ? '#fca5a5' : '#93c5fd',
+            highlight: {
+              background: isCritical ? '#dc2626' : '#2563eb',
+              border: '#ffffff'
+            },
+            hover: {
+              background: isCritical ? '#f87171' : '#60a5fa',
+              border: '#ffffff'
+            }
+          },
+          borderWidth: 2,
+          shadow: {
+            enabled: true,
+            color: isCritical ? 'rgba(239, 68, 68, 0.5)' : 'rgba(59, 130, 246, 0.45)',
+            size: 14,
+            x: 0,
+            y: 0
+          },
+          font: {
+            color: '#f8fafc',
+            size: 15,
+            face: 'Inter, system-ui, sans-serif',
+            strokeWidth: 3,
+            strokeColor: '#090d16'
+          }
+        };
+      });
+
+      const formattedEdges = data.edges.map(edge => ({
+        from: edge.from,
+        to: edge.to,
+        arrows: {
+          to: {
+            enabled: true,
+            scaleFactor: 0.9,
+            type: 'arrow'
+          }
+        },
+        color: {
+          color: 'rgba(148, 163, 184, 0.45)',
+          highlight: '#818cf8',
+          hover: '#a5b4fc',
+          opacity: 0.8
+        },
+        width: 2.5,
+        smooth: {
+          type: 'curvedCW',
+          roundness: 0.2
+        }
+      }));
+
+      nodesDataSet = new vis.DataSet(formattedNodes);
+      edgesDataSet = new vis.DataSet(formattedEdges);
+
+      const options = {
+        nodes: { scaling: { min: 20, max: 50 } },
+        edges: { selectionWidth: 3 },
+        physics: {
+          enabled: true,
+          solver: 'forceAtlas2Based',
+          forceAtlas2Based: {
+            gravitationalConstant: -70,
+            centralGravity: 0.015,
+            springLength: 160,
+            springConstant: 0.08,
+            damping: 0.45,
+            avoidOverlap: 0.8
+          },
+          stabilization: { iterations: 150 }
+        },
+        interaction: {
+          dragNodes: true,
+          dragView: true,
+          zoomView: true,
+          hover: true
+        }
+      };
+
+      if (network) {
+        network.destroy();
+      }
+
+      network = new vis.Network(container, { nodes: nodesDataSet, edges: edgesDataSet }, options);
+
+      network.on('click', function(params) {
+        if (params.nodes.length > 0) {
+          const selectedNodeId = params.nodes[0];
+          clearPulse();
+          inspectNodeWithAi(selectedNodeId);
+        } else {
+          clearPulse();
+          resetSidebar();
+        }
+      });
+
+      network.on('hoverNode', () => { container.style.cursor = 'pointer'; });
+      network.on('blurNode', () => { container.style.cursor = 'default'; });
+    }
+
+    // Highlighting / Pulsing neon animation on target bubble
+    function highlightAndPulseNode(nodeId) {
+      if (!nodesDataSet || !nodesDataSet.get(nodeId)) return;
+      clearPulse();
+      activePulseNodeId = nodeId;
+
+      const baseNode = graphData.nodes.find(n => n.id === nodeId);
+      const isCritical = baseNode && (baseNode.color === '#ef4444' || baseNode.incoming_count >= 2);
+      const baseSize = baseNode?.size || (isCritical ? 38 : 28);
+
+      let step = 0;
+      pulseInterval = setInterval(() => {
+        step++;
+        const isPulsePeak = step % 2 === 1;
+        nodesDataSet.update({
+          id: nodeId,
+          size: isPulsePeak ? baseSize + 10 : baseSize + 4,
+          borderWidth: isPulsePeak ? 6 : 4,
+          color: {
+            background: isCritical ? '#ef4444' : '#3b82f6',
+            border: '#22c55e',
+            highlight: {
+              background: isCritical ? '#dc2626' : '#2563eb',
+              border: '#22c55e'
+            }
+          },
+          shadow: {
+            enabled: true,
+            color: 'rgba(34, 197, 94, 0.95)',
+            size: isPulsePeak ? 30 : 16,
+            x: 0,
+            y: 0
+          }
+        });
+
+        // Stop pulsing after 8 iterations (approx 4 seconds) but keep clean highlight
+        if (step >= 8) {
+          clearInterval(pulseInterval);
+          pulseInterval = null;
+          nodesDataSet.update({
+            id: nodeId,
+            size: baseSize + 6,
+            borderWidth: 4,
+            color: {
+              background: isCritical ? '#ef4444' : '#3b82f6',
+              border: '#22c55e'
+            },
+            shadow: {
+              enabled: true,
+              color: 'rgba(34, 197, 94, 0.7)',
+              size: 20,
+              x: 0,
+              y: 0
+            }
+          });
+        }
+      }, 400);
+    }
+
+    function clearPulse() {
+      if (pulseInterval) {
+        clearInterval(pulseInterval);
+        pulseInterval = null;
+      }
+      if (activePulseNodeId && nodesDataSet) {
+        const baseNode = graphData?.nodes?.find(n => n.id === activePulseNodeId);
+        if (baseNode) {
+          const isCritical = baseNode.color === '#ef4444' || baseNode.incoming_count >= 2;
+          nodesDataSet.update({
+            id: activePulseNodeId,
+            size: baseNode.size || (isCritical ? 38 : 28),
+            borderWidth: 2,
+            color: {
+              background: isCritical ? '#ef4444' : '#3b82f6',
+              border: isCritical ? '#fca5a5' : '#93c5fd'
+            },
+            shadow: {
+              enabled: true,
+              color: isCritical ? 'rgba(239, 68, 68, 0.5)' : 'rgba(59, 130, 246, 0.45)',
+              size: 14,
+              x: 0,
+              y: 0
+            }
+          });
+        }
+        activePulseNodeId = null;
+      }
+    }
+
+    async function handleArchitectureSearch() {
+      const input = document.getElementById('architecture-query-input');
+      const query = input.value.trim();
+      if (!query) return;
+
+      const sidebarContent = document.getElementById('sidebar-content');
+      sidebarContent.innerHTML = `
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <div>
+            <p style="font-weight: 600; color: #fff; font-size: 0.95rem;">Searching Architecture...</p>
+            <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px;">Matching "${query}" across project modules</p>
+          </div>
+        </div>
+      `;
+
+      const result = await queryArchitectureApi(query);
+      if (!result || !result.target_node) {
+        sidebarContent.innerHTML = `
+          <div class="empty-state">
+            <p style="color: #f87171; font-weight: 600;">No match found</p>
+            <p style="font-size: 0.8rem; margin-top: 6px;">Try a different keyword or question.</p>
+          </div>
+        `;
+        return;
+      }
+
+      const targetNodeId = result.target_node;
+
+      // 1. Smoothly Zoom & Center on that bubble using vis-network focus
+      if (network) {
+        network.selectNodes([targetNodeId]);
+        network.focus(targetNodeId, {
+          scale: 1.5,
+          animation: {
+            duration: 800,
+            easingFunction: 'easeInOutQuad'
+          }
+        });
+      }
+
+      // 2. Pulse / Neon highlight bubble
+      highlightAndPulseNode(targetNodeId);
+
+      // 3. Open Inspector details with match rationale banner
+      await inspectNodeWithAi(targetNodeId, result.reason);
+    }
+
+    async function inspectNodeWithAi(nodeId, matchReason = null) {
+      const sidebarContent = document.getElementById('sidebar-content');
+      const localNode = graphData ? graphData.nodes.find(n => n.id === nodeId) : null;
+
+      // Loading State
+      sidebarContent.innerHTML = `
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <div>
+            <p style="font-weight: 600; color: #fff; font-size: 0.95rem;">Analyzing ${nodeId}...</p>
+            <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px;">Connecting to AI Explainer engine</p>
+          </div>
+        </div>
+      `;
+
+      const aiResult = await fetchAiExplanation(nodeId);
+
+      const filePath = aiResult?.file_path || `test_project/${nodeId}`;
+      const summary = aiResult?.summary || (localNode ? `Module ${nodeId} in project.` : 'No summary available.');
+      const riskScore = aiResult?.risk_score ?? (localNode?.incoming_count >= 2 ? 4 : (localNode?.incoming_count === 1 ? 2 : 1));
+      const riskLevel = aiResult?.risk_level || (riskScore >= 4 ? 'High' : (riskScore >= 3 ? 'Medium' : 'Low'));
+      const blastRadius = aiResult?.blast_radius_warning || 'Downstream impact analysis pending.';
+      const provider = aiResult?.provider || 'AI Explainer';
+      const incoming = aiResult?.incoming_dependencies || localNode?.incoming_dependencies || [];
+      const outgoing = aiResult?.outgoing_dependencies || localNode?.outgoing_dependencies || [];
+
+      let riskBadgeClass = 'risk-low';
+      let meterClass = 'low';
+      if (riskLevel === 'High' || riskLevel === 'Critical' || riskScore >= 4) {
+        riskBadgeClass = 'risk-high';
+        meterClass = 'high';
+      } else if (riskLevel === 'Medium' || riskScore === 3) {
+        riskBadgeClass = 'risk-medium';
+        meterClass = 'medium';
+      }
+
+      const incomingHtml = incoming.length > 0
+        ? incoming.map(dep => `
+            <div class="dep-item" onclick="focusNode('${dep}')">
+              <span>${dep}</span>
+              <span class="dep-arrow">→ calls this</span>
+            </div>
+          `).join('')
+        : `<div class="no-deps">Root module (No incoming dependencies)</div>`;
+
+      const outgoingHtml = outgoing.length > 0
+        ? outgoing.map(dep => `
+            <div class="dep-item" onclick="focusNode('${dep}')">
+              <span>${dep}</span>
+              <span class="dep-arrow">imported →</span>
+            </div>
+          `).join('')
+        : `<div class="no-deps">Leaf module (No external dependencies)</div>`;
+
+      const matchBannerHtml = matchReason ? `
+        <div class="search-match-banner">
+          <svg class="search-match-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <div>
+            <div class="search-match-title">Architecture Query Match</div>
+            <div class="search-match-text">${matchReason}</div>
+          </div>
+        </div>
+      ` : '';
+
+      sidebarContent.innerHTML = `
+        ${matchBannerHtml}
+
+        <!-- File Header Card -->
+        <div class="card file-header-card">
+          <div class="file-path">${filePath}</div>
+          <div class="file-title-row">
+            <span class="file-title">${nodeId}</span>
+            <span class="risk-badge ${riskBadgeClass}">
+              <span>●</span> Risk ${riskScore}/5 (${riskLevel})
+            </span>
+          </div>
+
+          <div class="risk-meter-container">
+            <div class="risk-meter-header">
+              <span>Architecture Blast Risk</span>
+              <span>${riskLevel} Priority</span>
+            </div>
+            <div class="meter-track">
+              <div class="meter-fill ${meterClass}"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Summary Card -->
+        <div class="card ai-summary-box">
+          <div class="section-label">
+            <span>AI Code Summary</span>
+            <span class="ai-badge">AI Verified</span>
+          </div>
+          <p class="summary-text">${summary}</p>
+          <div class="provider-tag">
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span>Analyzed via ${provider}</span>
+          </div>
+        </div>
+
+        <!-- Blast Radius Warning -->
+        <div class="card blast-radius-box ${riskScore <= 2 ? 'low-risk' : ''}">
+          <div class="blast-title ${riskScore >= 3 ? 'red' : 'green'}">
+            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            <span>Direct Blast Radius Impact</span>
+          </div>
+          <p class="blast-desc">${blastRadius}</p>
+        </div>
+
+        <!-- Incoming Dependencies -->
+        <div class="dep-section">
+          <div class="section-label">
+            <span>Imported By (${incoming.length})</span>
+            <span style="font-size: 0.68rem; color: var(--accent-cyan);">Inbound</span>
+          </div>
+          <div class="dep-list">
+            ${incomingHtml}
+          </div>
+        </div>
+
+        <!-- Outgoing Dependencies -->
+        <div class="dep-section">
+          <div class="section-label">
+            <span>Imports (${outgoing.length})</span>
+            <span style="font-size: 0.68rem; color: var(--accent-purple);">Outbound</span>
+          </div>
+          <div class="dep-list">
+            ${outgoingHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    function resetSidebar() {
+      const sidebarContent = document.getElementById('sidebar-content');
+      sidebarContent.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+            </svg>
+          </div>
+          <p style="font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Select a Module or Ask a Question</p>
+          <p style="font-size: 0.8rem; line-height: 1.4;">Type a query like <em>"Where is database handled?"</em> in the search bar or click any node to inspect.</p>
+        </div>
+      `;
+    }
+
+    function focusNode(nodeId) {
+      if (!network) return;
+      clearPulse();
+      network.selectNodes([nodeId]);
+      network.focus(nodeId, {
+        scale: 1.3,
+        animation: { duration: 500, easingFunction: 'easeInOutQuad' }
+      });
+      inspectNodeWithAi(nodeId);
+    }
+
+    // Search events
+    document.getElementById('btn-search-architecture').addEventListener('click', handleArchitectureSearch);
+    document.getElementById('architecture-query-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleArchitectureSearch();
+      }
+    });
+
+    // Navigation Controls
+    document.getElementById('btn-fit').addEventListener('click', () => {
+      clearPulse();
+      if (network) network.fit({ animation: { duration: 400 } });
+    });
+
+    document.getElementById('ctrl-zoom-in').addEventListener('click', () => {
+      if (network) {
+        const scale = network.getScale();
+        network.moveTo({ scale: scale * 1.3, animation: { duration: 250 } });
+      }
+    });
+
+    document.getElementById('ctrl-zoom-out').addEventListener('click', () => {
+      if (network) {
+        const scale = network.getScale();
+        network.moveTo({ scale: scale / 1.3, animation: { duration: 250 } });
+      }
+    });
+
+    document.getElementById('ctrl-physics').addEventListener('click', (e) => {
+      physicsEnabled = !physicsEnabled;
+      if (network) {
+        network.setOptions({ physics: { enabled: physicsEnabled } });
+      }
+      e.currentTarget.style.color = physicsEnabled ? 'var(--text-primary)' : 'var(--text-muted)';
+    });
+
+    document.getElementById('btn-reload').addEventListener('click', async () => {
+      clearPulse();
+      const data = await fetchGraphData();
+      initNetwork(data);
+      resetSidebar();
+    });
+
+    // Boot
+    window.addEventListener('DOMContentLoaded', async () => {
+      const data = await fetchGraphData();
+      initNetwork(data);
+    });
+  </script>
+</body>
+</html>

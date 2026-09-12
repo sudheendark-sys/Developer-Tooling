@@ -1,0 +1,76 @@
+{
+  "nodes": [
+    {
+      "id": "app.py",
+      "label": "app.py",
+      "color": "#3b82f6",
+      "incoming_count": 0,
+      "outgoing_count": 2,
+      "incoming_dependencies": [],
+      "outgoing_dependencies": [
+        "auth.py",
+        "database.py"
+      ],
+      "size": 26,
+      "font": {
+        "color": "#f8fafc",
+        "size": 14,
+        "face": "Inter, system-ui, sans-serif"
+      }
+    },
+    {
+      "id": "auth.py",
+      "label": "auth.py",
+      "color": "#3b82f6",
+      "incoming_count": 1,
+      "outgoing_count": 1,
+      "incoming_dependencies": [
+        "app.py"
+      ],
+      "outgoing_dependencies": [
+        "database.py"
+      ],
+      "size": 34,
+      "font": {
+        "color": "#f8fafc",
+        "size": 14,
+        "face": "Inter, system-ui, sans-serif"
+      }
+    },
+    {
+      "id": "database.py",
+      "label": "database.py",
+      "color": "#ef4444",
+      "incoming_count": 2,
+      "outgoing_count": 0,
+      "incoming_dependencies": [
+        "app.py",
+        "auth.py"
+      ],
+      "outgoing_dependencies": [],
+      "size": 42,
+      "font": {
+        "color": "#f8fafc",
+        "size": 14,
+        "face": "Inter, system-ui, sans-serif"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "app.py",
+      "to": "auth.py",
+      "arrows": "to"
+    },
+    {
+      "from": "app.py",
+      "to": "database.py",
+      "arrows": "to"
+    },
+    {
+      "from": "auth.py",
+      "to": "database.py",
+      "arrows": "to"
+    }
+  ]
+}
