@@ -101,9 +101,6 @@
 
 <body class="bg-canvas text-slate-100 font-sans h-screen w-screen overflow-hidden flex flex-col relative select-none">
 
-  <!-- Full-Viewport Canvas Background -->
-  <div id="graph-canvas" class="absolute inset-0 z-0 bg-[#0b0f19]"></div>
-
   <!-- FLOATING GLASS TOPBAR -->
   <header class="relative z-30 mx-4 mt-3 flex-shrink-0">
     <div class="bg-slate-900/80 backdrop-blur-md border border-slate-700/50 rounded-2xl px-4 py-2.5 shadow-2xl flex items-center justify-between gap-4">
@@ -220,6 +217,9 @@
 
   <!-- Workspace Container: Graph Canvas + Floating Overlays -->
   <main class="relative flex-1 w-full h-full overflow-hidden">
+
+    <!-- Interactive Vis-Network Canvas -->
+    <div id="graph-canvas" class="absolute inset-0 w-full h-full z-0 pointer-events-auto bg-[#0b0f19]"></div>
 
     <!-- Active Blast Radius Simulation Floating Banner -->
     <div id="blast-status-banner" class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-amber-950/80 backdrop-blur-md border border-orange-500/50 rounded-xl px-4 py-2 text-xs text-orange-200 shadow-2xl flex items-center gap-3 animate-bounce-subtle">
@@ -703,10 +703,13 @@
           stabilization: { iterations: 160 }
         },
         interaction: {
+          hover: true,
+          selectable: true,
+          selectConnectedEdges: true,
+          multiselect: false,
           dragNodes: true,
           dragView: true,
-          zoomView: true,
-          hover: true
+          zoomView: true
         }
       };
 
@@ -715,11 +718,19 @@
       }
 
       network = new vis.Network(container, { nodes: nodesDataSet, edges: edgesDataSet }, options);
+      console.log("Network initialized successfully", network);
 
-      network.on("click", function(params) {
-        if (params.nodes.length > 0) {
-          const selectedNodeId = params.nodes[0];
-          openModuleInspector(selectedNodeId);
+      network.on("selectNode", function (params) {
+        console.log("Selected node:", params.nodes);
+        if (params.nodes && params.nodes.length > 0) {
+          openModuleInspector(params.nodes[0]);
+        }
+      });
+
+      network.on("click", function (params) {
+        console.log("Canvas clicked:", params);
+        if (params.nodes && params.nodes.length > 0) {
+          openModuleInspector(params.nodes[0]);
         } else {
           clearPulse();
           if (!isBlastModeActive) {
@@ -734,6 +745,7 @@
 
     // Open Module Inspector Drawer and Populate Details
     async function openModuleInspector(nodeId, matchReason = null) {
+      console.log("Opening inspector for:", nodeId);
       currentlySelectedNodeId = nodeId;
       clearPulse();
 
