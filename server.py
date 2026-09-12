@@ -4,6 +4,7 @@ import os
 import re
 import urllib.error
 import urllib.request
+from collections import deque
 from pathlib import Path
 from flask import Flask, jsonify, request, send_from_directory
 
@@ -33,6 +34,50 @@ def get_ast_details(file_path: Path):
         }
     except Exception as e:
         return {"source": "", "functions": [], "classes": [], "docstring": "", "error": str(e)}
+
+
+def calculate_blast_radius(target_file: str, graph_data: dict):
+    """Calculate all directly and transitively affected downstream files if target_file breaks."""
+    edges = graph_data.get("edges", [])
+    nodes = graph_data.get("nodes", [])
+
+    # Map of target -> list of sources that import target (direct dependents)
+    dependents_map = {n["id"]: [] for n in nodes}
+    for edge in edges:
+        src = edge.get("from")
+        dst = edge.get("to")
+        if dst in dependents_map:
+            dependents_map[dst].append(src)
+
+    # Breadth-first search for all downstream affected modules
+    queue = deque([target_file])
+    visited = set()
+    affected = set()
+
+    while queue:
+        curr = queue.popleft()
+        for parent in dependents_map.get(curr, []):
+            if parent not in visited and parent != target_file:
+                visited.add(parent)
+                affected.add(parent)
+                queue.append(parent)
+
+    affected_list = sorted(list(affected))
+    count = len(affected_list)
+
+    if count >= 2:
+        severity = "CRITICAL"
+    elif count == 1:
+        severity = "MODERATE"
+    else:
+        severity = "LOW"
+
+    return {
+        "target": target_file,
+        "affected_nodes": affected_list,
+        "severity": severity,
+        "affected_count": count
+    }
 
 
 def generate_heuristic_explanation(filename: str, source: str, ast_info: dict, node_meta: dict):
@@ -168,7 +213,6 @@ def find_best_matching_node(query: str, files_context: list, api_key: str = ""):
     if not clean_query:
         return None
 
-    # 1. Try Gemini API if key is present
     if api_key:
         try:
             files_desc = "\n\n".join([
@@ -206,11 +250,9 @@ Respond ONLY with JSON matching:
         except Exception as e:
             print(f"Gemini query search failed, falling back to local ranker: {e}")
 
-    # 2. Intelligent Heuristic / Semantic Token Ranker
     query_lower = clean_query.lower()
     tokens = re.findall(r"\w+", query_lower)
 
-    # Domain synonyms
     synonyms = {
         "database": ["db", "database", "get_db", "sql", "storage", "connection", "persistence", "data", "table", "store"],
         "auth": ["auth", "authentication", "login", "user", "password", "token", "session", "credential", "logout", "signin"],
@@ -230,25 +272,21 @@ Respond ONLY with JSON matching:
         score = 0
         match_details = []
 
-        # Exact filename mention
         if stem in query_lower or filename.lower() in query_lower:
             score += 15
             match_details.append(f"matches file name '{filename}'")
 
-        # Function name matches
         for fn in funcs:
             if fn in query_lower:
                 score += 12
                 match_details.append(f"defines function '{fn}()'")
 
-        # Domain synonym matches
         target_syns = synonyms.get(stem, [stem])
         for syn in target_syns:
             if syn in tokens or syn in query_lower:
                 score += 8
                 match_details.append(f"matches domain concept '{syn}'")
 
-        # Source code content matches
         for token in tokens:
             if len(token) > 2 and token in source_lower:
                 score += 3
@@ -261,10 +299,8 @@ Respond ONLY with JSON matching:
         else:
             reasons[filename] = f"Matched keywords in {filename}."
 
-    # Pick top scoring file
     best_file = max(scores, key=scores.get)
     if scores[best_file] > 0:
-        # Generate friendly clear reason
         stem = best_file.replace(".py", "")
         if stem == "database":
             final_reason = "Handles database connections, queries, and data persistence logic."
@@ -281,10 +317,9 @@ Respond ONLY with JSON matching:
             "score": scores[best_file]
         }
 
-    # Fallback to database.py or first file if zero match
     return {
         "target_node": files_context[0]["filename"] if files_context else "app.py",
-        "reason": f"Closest match based on project architecture index."
+        "reason": "Closest match based on project architecture index."
     }
 
 
@@ -365,6 +400,27 @@ def query_architecture():
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
     result = find_best_matching_node(query, files_context, gemini_key)
 
+    return jsonify(result)
+
+
+@app.route("/api/blast-radius", methods=["POST"])
+def blast_radius_endpoint():
+    """Calculate downstream dependency blast radius for a given target file."""
+    data = request.get_json(force=True) if request.is_json else request.form
+    filename = data.get("filename", "") if data else ""
+
+    if not filename:
+        return jsonify({"error": "No filename provided"}), 400
+
+    clean_filename = Path(filename).name
+    graph_data = build_graph_data("test_project", "graph_data.json")
+
+    # Verify node exists in graph
+    node_exists = any(n["id"] == clean_filename for n in graph_data.get("nodes", []))
+    if not node_exists:
+        return jsonify({"error": f"File '{clean_filename}' not found in dependency graph."}), 404
+
+    result = calculate_blast_radius(clean_filename, graph_data)
     return jsonify(result)
 
 

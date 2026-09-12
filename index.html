@@ -3,19 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RepoNavigator | Ask the Architecture & Dependency Explorer</title>
-  <meta name="description" content="Interactive architecture visualizer and AI dependency explainer for RepoNavigator." />
+  <title>RepoNavigator | Visual Blast-Radius & Architecture Explorer</title>
+  <meta name="description" content="Interactive architecture visualizer, dependency blast-radius simulator, and AI code explainer." />
   
   <!-- Google Fonts & Vis Network CDN -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 
   <style>
     :root {
       --bg-dark: #080c14;
-      --bg-surface: rgba(15, 23, 42, 0.85);
+      --bg-surface: rgba(15, 23, 42, 0.88);
       --bg-card: rgba(30, 41, 59, 0.65);
       --border-color: rgba(148, 163, 184, 0.14);
       --border-active: rgba(99, 102, 241, 0.5);
@@ -24,6 +24,7 @@
       --text-muted: #64748b;
       --accent-blue: #3b82f6;
       --accent-red: #ef4444;
+      --accent-orange: #f97316;
       --accent-purple: #8b5cf6;
       --accent-amber: #f59e0b;
       --accent-emerald: #10b981;
@@ -56,7 +57,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 20px;
-      background: rgba(10, 15, 30, 0.9);
+      background: rgba(10, 15, 30, 0.92);
       backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border-color);
       z-index: 20;
@@ -119,7 +120,7 @@
     /* Ask the Architecture Search Bar */
     .search-container {
       flex: 1;
-      max-width: 600px;
+      max-width: 580px;
       position: relative;
       display: flex;
       align-items: center;
@@ -212,10 +213,6 @@
       transform: translateY(-1px);
     }
 
-    .search-btn:active {
-      transform: translateY(0);
-    }
-
     .header-actions {
       display: flex;
       align-items: center;
@@ -254,6 +251,82 @@
       background: linear-gradient(135deg, #4338ca, #2563eb);
     }
 
+    /* Blast Radius Simulation Trigger Button */
+    .btn-blast {
+      background: linear-gradient(135deg, #ea580c, #f97316);
+      border: 1px solid rgba(249, 115, 22, 0.4);
+      color: #fff;
+      font-weight: 700;
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.84rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 3px 14px rgba(234, 88, 12, 0.35);
+      transition: all 0.2s ease;
+      margin-top: 10px;
+    }
+
+    .btn-blast:hover {
+      background: linear-gradient(135deg, #c2410c, #ea580c);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 18px rgba(234, 88, 12, 0.5);
+    }
+
+    .btn-reset-view {
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      font-size: 0.78rem;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-reset-view:hover {
+      background: rgba(51, 65, 85, 0.9);
+      color: #fff;
+      border-color: rgba(148, 163, 184, 0.4);
+    }
+
+    /* Active Blast Mode Bar on Canvas */
+    .blast-active-banner {
+      position: absolute;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(234, 88, 12, 0.2);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(249, 115, 22, 0.5);
+      border-radius: 12px;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 8px 32px rgba(234, 88, 12, 0.3);
+      z-index: 12;
+      animation: bannerSlideIn 0.3s ease-out;
+    }
+
+    .blast-active-text {
+      font-size: 0.85rem;
+      color: #ffedd5;
+      font-weight: 500;
+    }
+
+    .blast-active-text strong {
+      color: #fed7aa;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
     /* Workspace Layout */
     .main-container {
       display: flex;
@@ -284,7 +357,7 @@
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
       z-index: 10;
       pointer-events: auto;
-      max-width: 290px;
+      max-width: 320px;
     }
 
     .legend-title {
@@ -321,14 +394,19 @@
       box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
     }
 
+    .legend-dot.orange {
+      background: var(--accent-orange);
+      box-shadow: 0 0 10px rgba(249, 115, 22, 0.8);
+    }
+
     .legend-dot.blue {
       background: var(--accent-blue);
       box-shadow: 0 0 10px rgba(59, 130, 246, 0.6);
     }
 
-    .legend-dot.neon {
-      background: var(--accent-neon);
-      box-shadow: 0 0 12px rgba(34, 197, 94, 0.8);
+    .legend-dot.dimmed {
+      background: #475569;
+      opacity: 0.4;
     }
 
     /* Floating Canvas Controls */
@@ -640,7 +718,7 @@
     /* Blast Radius Callout */
     .blast-radius-box {
       background: rgba(239, 68, 68, 0.08);
-      border: 1px solid rgba(239, 68, 68, 0.25);
+      border: 1px solid rgba(239, 68, 68, 0.28);
       border-left: 4px solid var(--accent-red);
     }
 
@@ -717,26 +795,6 @@
       font-style: italic;
       padding: 4px 0;
     }
-
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.75rem;
-      color: #34d399;
-      background: rgba(16, 185, 129, 0.1);
-      border: 1px solid rgba(16, 185, 129, 0.2);
-      padding: 4px 10px;
-      border-radius: 6px;
-    }
-
-    .status-dot {
-      width: 6px;
-      height: 6px;
-      background: #10b981;
-      border-radius: 50%;
-      box-shadow: 0 0 6px #10b981;
-    }
   </style>
 </head>
 <body>
@@ -752,7 +810,7 @@
       <div>
         <h1 class="brand-title">RepoNavigator</h1>
         <div class="brand-subtitle">
-          <span>Architecture Explorer</span>
+          <span>Architecture & Blast-Radius Explorer</span>
           <span class="ai-badge">AI Powered</span>
         </div>
       </div>
@@ -790,10 +848,13 @@
         </svg>
         Center
       </button>
-      <button class="btn btn-primary" id="btn-reload" title="Refresh Graph from Server">
+      <button class="btn" id="btn-reset-graph" title="Reset Graph Colors and Blast Dimming">
         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
         </svg>
+        Reset View
+      </button>
+      <button class="btn btn-primary" id="btn-reload" title="Refresh Graph Data">
         Reload
       </button>
     </div>
@@ -803,6 +864,17 @@
   <div class="main-container">
     <!-- Graph Viewport -->
     <div id="graph-container">
+      <!-- Active Blast Radius Floating Banner (Hidden by default) -->
+      <div id="blast-status-banner" class="blast-active-banner" style="display: none;">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#f97316">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+        <div class="blast-active-text" id="blast-banner-text">
+          Blast Radius: <strong id="blast-target-name">database.py</strong> &rarr; <span id="blast-affected-count">2</span> downstream modules affected
+        </div>
+        <button class="btn-reset-view" id="btn-clear-blast">Clear Simulation</button>
+      </div>
+
       <div class="canvas-controls">
         <button class="control-btn" id="ctrl-zoom-in" title="Zoom In">+</button>
         <button class="control-btn" id="ctrl-zoom-out" title="Zoom Out">−</button>
@@ -810,18 +882,22 @@
       </div>
 
       <div class="canvas-legend">
-        <div class="legend-title">Dependency Metrics</div>
+        <div class="legend-title">Graph Legend</div>
         <div class="legend-item">
           <div class="legend-dot red"></div>
-          <span><strong>High Hub</strong> (≥ 2 Incoming Imports)</span>
+          <span><strong>Target / High Hub</strong> (Source / ≥2 Inbound)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot orange"></div>
+          <span><strong>Affected Downstream</strong> (Blast Impact)</span>
         </div>
         <div class="legend-item">
           <div class="legend-dot blue"></div>
-          <span><strong>Standard Module</strong> (&lt; 2 Incoming)</span>
+          <span><strong>Standard Module</strong></span>
         </div>
         <div class="legend-item">
-          <div class="legend-dot neon"></div>
-          <span><strong>Active / Focus Target</strong></span>
+          <div class="legend-dot dimmed"></div>
+          <span><strong>Unrelated / Dimmed</strong></span>
         </div>
       </div>
     </div>
@@ -845,7 +921,7 @@
             </svg>
           </div>
           <p style="font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Select a Module or Ask a Question</p>
-          <p style="font-size: 0.8rem; line-height: 1.4;">Type a query like <em>"Where is database handled?"</em> in the search bar or click any node to inspect.</p>
+          <p style="font-size: 0.8rem; line-height: 1.4;">Click any bubble or use search to inspect architecture and simulate blast radius.</p>
         </div>
       </div>
     </aside>
@@ -859,6 +935,8 @@
     let physicsEnabled = true;
     let activePulseNodeId = null;
     let pulseInterval = null;
+    let currentlySelectedNodeId = null;
+    let isBlastModeActive = false;
 
     // Detect OS for shortcut hint
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
@@ -867,7 +945,7 @@
       shortcutHint.textContent = isMac ? '⌘K' : 'Ctrl+K';
     }
 
-    // Global keyboard shortcut (Cmd+K or Ctrl+K)
+    // Keyboard shortcut (Cmd+K / Ctrl+K)
     window.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
@@ -921,6 +999,21 @@
       }
     }
 
+    async function fetchBlastRadiusApi(filename) {
+      try {
+        const response = await fetch('/api/blast-radius', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: filename })
+        });
+        if (!response.ok) throw new Error("Blast radius API error " + response.status);
+        return await response.json();
+      } catch (err) {
+        console.error("Blast radius fetch failed:", err);
+        return null;
+      }
+    }
+
     function initNetwork(data) {
       graphData = data;
       const container = document.getElementById('graph-container');
@@ -963,6 +1056,7 @@
       });
 
       const formattedEdges = data.edges.map(edge => ({
+        id: `${edge.from}->${edge.to}`,
         from: edge.from,
         to: edge.to,
         arrows: {
@@ -1021,11 +1115,19 @@
       network.on('click', function(params) {
         if (params.nodes.length > 0) {
           const selectedNodeId = params.nodes[0];
+          currentlySelectedNodeId = selectedNodeId;
           clearPulse();
-          inspectNodeWithAi(selectedNodeId);
+          if (isBlastModeActive) {
+            // If in blast mode, clicking a new node runs blast on it or standard inspection
+            inspectNodeWithAi(selectedNodeId);
+          } else {
+            inspectNodeWithAi(selectedNodeId);
+          }
         } else {
           clearPulse();
-          resetSidebar();
+          if (!isBlastModeActive) {
+            resetSidebar();
+          }
         }
       });
 
@@ -1033,7 +1135,210 @@
       network.on('blurNode', () => { container.style.cursor = 'default'; });
     }
 
-    // Highlighting / Pulsing neon animation on target bubble
+    // Visual Blast Radius Simulation with Graph Dimming
+    async function simulateBlastRadius(targetNodeId) {
+      if (!graphData) return;
+      isBlastModeActive = true;
+      clearPulse();
+
+      const blastResult = await fetchBlastRadiusApi(targetNodeId);
+      if (!blastResult) return;
+
+      const affectedNodes = blastResult.affected_nodes || [];
+      const affectedSet = new Set(affectedNodes);
+
+      // Show Floating Blast Status Banner
+      const banner = document.getElementById('blast-status-banner');
+      const targetNameEl = document.getElementById('blast-target-name');
+      const affectedCountEl = document.getElementById('blast-affected-count');
+      if (banner && targetNameEl && affectedCountEl) {
+        targetNameEl.textContent = targetNodeId;
+        affectedCountEl.textContent = affectedNodes.length;
+        banner.style.display = 'flex';
+      }
+
+      // 1. Update Nodes Styling
+      const nodeUpdates = [];
+      graphData.nodes.forEach(node => {
+        const id = node.id;
+        const baseSize = node.size || 28;
+
+        if (id === targetNodeId) {
+          // Target Node: High Alert Red with thick border & glowing shadow
+          nodeUpdates.push({
+            id: id,
+            size: baseSize + 8,
+            borderWidth: 5,
+            color: {
+              background: '#ef4444',
+              border: '#fca5a5',
+              highlight: { background: '#dc2626', border: '#ffffff' }
+            },
+            shadow: {
+              enabled: true,
+              color: 'rgba(239, 68, 68, 0.95)',
+              size: 28,
+              x: 0,
+              y: 0
+            },
+            font: {
+              color: '#ffffff',
+              size: 16,
+              strokeWidth: 4,
+              strokeColor: '#000000'
+            }
+          });
+        } else if (affectedSet.has(id)) {
+          // Affected Downstream Nodes: Bright Orange (#f97316)
+          nodeUpdates.push({
+            id: id,
+            size: baseSize + 6,
+            borderWidth: 4,
+            color: {
+              background: '#f97316',
+              border: '#fed7aa',
+              highlight: { background: '#ea580c', border: '#ffffff' }
+            },
+            shadow: {
+              enabled: true,
+              color: 'rgba(249, 115, 22, 0.9)',
+              size: 22,
+              x: 0,
+              y: 0
+            },
+            font: {
+              color: '#fff7ed',
+              size: 15,
+              strokeWidth: 3,
+              strokeColor: '#000000'
+            }
+          });
+        } else {
+          // Unrelated Nodes: Dimmed to low opacity gray
+          nodeUpdates.push({
+            id: id,
+            size: 20,
+            borderWidth: 1,
+            color: {
+              background: 'rgba(30, 41, 59, 0.35)',
+              border: 'rgba(71, 85, 105, 0.35)',
+              highlight: { background: 'rgba(51, 65, 85, 0.6)', border: '#64748b' }
+            },
+            shadow: { enabled: false },
+            font: {
+              color: '#64748b',
+              size: 12,
+              strokeWidth: 0
+            }
+          });
+        }
+      });
+      nodesDataSet.update(nodeUpdates);
+
+      // 2. Update Edges Styling (Highlight danger path, dim rest)
+      const edgeUpdates = [];
+      graphData.edges.forEach(edge => {
+        const edgeId = `${edge.from}->${edge.to}`;
+        const isTargetToAffected = (edge.to === targetNodeId) || 
+                                   (affectedSet.has(edge.from) && (edge.to === targetNodeId || affectedSet.has(edge.to)));
+
+        if (isTargetToAffected) {
+          edgeUpdates.push({
+            id: edgeId,
+            width: 3.5,
+            color: {
+              color: '#f97316',
+              highlight: '#ea580c',
+              hover: '#fb923c',
+              opacity: 1.0
+            },
+            arrows: { to: { enabled: true, scaleFactor: 1.2 } }
+          });
+        } else {
+          edgeUpdates.push({
+            id: edgeId,
+            width: 1.2,
+            color: {
+              color: 'rgba(71, 85, 105, 0.15)',
+              opacity: 0.15
+            },
+            arrows: { to: { enabled: true, scaleFactor: 0.5 } }
+          });
+        }
+      });
+      edgesDataSet.update(edgeUpdates);
+
+      // 3. Smoothly center view on target and affected nodes
+      if (network) {
+        const focusIds = [targetNodeId, ...affectedNodes];
+        network.fit({
+          nodes: focusIds,
+          animation: { duration: 600, easingFunction: 'easeInOutQuad' }
+        });
+      }
+    }
+
+    // Reset View / Restore original styling
+    function resetGraphView() {
+      isBlastModeActive = false;
+      clearPulse();
+
+      const banner = document.getElementById('blast-status-banner');
+      if (banner) banner.style.display = 'none';
+
+      if (!graphData) return;
+
+      const originalNodes = graphData.nodes.map(node => {
+        const isCritical = node.color === '#ef4444' || node.incoming_count >= 2;
+        return {
+          id: node.id,
+          size: node.size || (isCritical ? 38 : 28),
+          borderWidth: 2,
+          color: {
+            background: isCritical ? '#ef4444' : '#3b82f6',
+            border: isCritical ? '#fca5a5' : '#93c5fd',
+            highlight: {
+              background: isCritical ? '#dc2626' : '#2563eb',
+              border: '#ffffff'
+            }
+          },
+          shadow: {
+            enabled: true,
+            color: isCritical ? 'rgba(239, 68, 68, 0.5)' : 'rgba(59, 130, 246, 0.45)',
+            size: 14,
+            x: 0,
+            y: 0
+          },
+          font: {
+            color: '#f8fafc',
+            size: 15,
+            face: 'Inter, system-ui, sans-serif',
+            strokeWidth: 3,
+            strokeColor: '#090d16'
+          }
+        };
+      });
+
+      const originalEdges = graphData.edges.map(edge => ({
+        id: `${edge.from}->${edge.to}`,
+        width: 2.5,
+        color: {
+          color: 'rgba(148, 163, 184, 0.45)',
+          highlight: '#818cf8',
+          hover: '#a5b4fc',
+          opacity: 0.8
+        },
+        arrows: { to: { enabled: true, scaleFactor: 0.9 } }
+      }));
+
+      nodesDataSet.update(originalNodes);
+      edgesDataSet.update(originalEdges);
+
+      if (network) {
+        network.fit({ animation: { duration: 500 } });
+      }
+    }
+
     function highlightAndPulseNode(nodeId) {
       if (!nodesDataSet || !nodesDataSet.get(nodeId)) return;
       clearPulse();
@@ -1068,7 +1373,6 @@
           }
         });
 
-        // Stop pulsing after 8 iterations (approx 4 seconds) but keep clean highlight
         if (step >= 8) {
           clearInterval(pulseInterval);
           pulseInterval = null;
@@ -1150,31 +1454,25 @@
       }
 
       const targetNodeId = result.target_node;
+      currentlySelectedNodeId = targetNodeId;
 
-      // 1. Smoothly Zoom & Center on that bubble using vis-network focus
       if (network) {
         network.selectNodes([targetNodeId]);
         network.focus(targetNodeId, {
           scale: 1.5,
-          animation: {
-            duration: 800,
-            easingFunction: 'easeInOutQuad'
-          }
+          animation: { duration: 800, easingFunction: 'easeInOutQuad' }
         });
       }
 
-      // 2. Pulse / Neon highlight bubble
       highlightAndPulseNode(targetNodeId);
-
-      // 3. Open Inspector details with match rationale banner
       await inspectNodeWithAi(targetNodeId, result.reason);
     }
 
     async function inspectNodeWithAi(nodeId, matchReason = null) {
+      currentlySelectedNodeId = nodeId;
       const sidebarContent = document.getElementById('sidebar-content');
       const localNode = graphData ? graphData.nodes.find(n => n.id === nodeId) : null;
 
-      // Loading State
       sidebarContent.innerHTML = `
         <div class="loading-state">
           <div class="spinner"></div>
@@ -1275,7 +1573,7 @@
           </div>
         </div>
 
-        <!-- Blast Radius Warning -->
+        <!-- Direct Blast Radius Impact Box with Simulation Button -->
         <div class="card blast-radius-box ${riskScore <= 2 ? 'low-risk' : ''}">
           <div class="blast-title ${riskScore >= 3 ? 'red' : 'green'}">
             <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1284,6 +1582,13 @@
             <span>Direct Blast Radius Impact</span>
           </div>
           <p class="blast-desc">${blastRadius}</p>
+
+          <button class="btn-blast" id="btn-trigger-blast" onclick="simulateBlastRadius('${nodeId}')">
+            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span>⚡ Simulate Blast Radius</span>
+          </button>
         </div>
 
         <!-- Incoming Dependencies -->
@@ -1320,7 +1625,7 @@
             </svg>
           </div>
           <p style="font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Select a Module or Ask a Question</p>
-          <p style="font-size: 0.8rem; line-height: 1.4;">Type a query like <em>"Where is database handled?"</em> in the search bar or click any node to inspect.</p>
+          <p style="font-size: 0.8rem; line-height: 1.4;">Click any bubble or use search to inspect architecture and simulate blast radius.</p>
         </div>
       `;
     }
@@ -1336,7 +1641,7 @@
       inspectNodeWithAi(nodeId);
     }
 
-    // Search events
+    // Search event bindings
     document.getElementById('btn-search-architecture').addEventListener('click', handleArchitectureSearch);
     document.getElementById('architecture-query-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -1345,9 +1650,12 @@
       }
     });
 
+    // Reset controls
+    document.getElementById('btn-reset-graph').addEventListener('click', resetGraphView);
+    document.getElementById('btn-clear-blast').addEventListener('click', resetGraphView);
+
     // Navigation Controls
     document.getElementById('btn-fit').addEventListener('click', () => {
-      clearPulse();
       if (network) network.fit({ animation: { duration: 400 } });
     });
 
@@ -1374,7 +1682,7 @@
     });
 
     document.getElementById('btn-reload').addEventListener('click', async () => {
-      clearPulse();
+      resetGraphView();
       const data = await fetchGraphData();
       initNetwork(data);
       resetSidebar();
