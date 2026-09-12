@@ -19,6 +19,21 @@ def should_skip_dir(dir_path: Path) -> bool:
     return False
 
 
+def is_test_file(rel_path: str, filename: str) -> bool:
+    """Detect if a Python file is a unit test or integration test file."""
+    rel_lower = rel_path.lower().replace("\\", "/")
+    fn_lower = filename.lower()
+    return (
+        fn_lower.startswith("test_")
+        or fn_lower.endswith("_test.py")
+        or "/tests/" in f"/{rel_lower}"
+        or "/test/" in f"/{rel_lower}"
+        or rel_lower.startswith("tests/")
+        or rel_lower.startswith("test/")
+        or "conftest.py" == fn_lower
+    )
+
+
 def extract_imports(filepath: Path):
     """Extract imported module names and relative imports from a Python file using AST."""
     imports = []
@@ -29,19 +44,16 @@ def extract_imports(filepath: Path):
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
-                    # Full name and top-level module
                     imports.append(alias.name)
                     imports.append(alias.name.split(".")[0])
             elif isinstance(node, ast.ImportFrom):
                 if node.module:
                     imports.append(node.module)
                     imports.append(node.module.split(".")[0])
-                    # Also include module.submodule combinations
                     for alias in node.names:
                         imports.append(f"{node.module}.{alias.name}")
                         imports.append(alias.name)
                 else:
-                    # Relative import like "from . import utils" or "from .database import get_db"
                     for alias in node.names:
                         imports.append(alias.name)
     except Exception as e:
@@ -70,17 +82,12 @@ def build_graph_data(directory: str = "test_project", output_file: str = "graph_
     project_dir = Path(directory).resolve()
     if not project_dir.exists():
         print(f"Directory '{directory}' does not exist.")
-        return {"nodes": [], "edges": []}
+        return {"nodes": [], "edges": [], "stats": {"total_files": 0, "total_connections": 0, "critical_hubs": 0}}
 
     py_files = find_all_py_files(project_dir)
     if not py_files:
-        # Fallback to direct top-level glob if empty
         py_files = sorted(project_dir.glob("*.py"))
 
-    # Mapping helpers for module resolution
-    # 1. relative path (e.g. "auth.py" or "src/auth.py")
-    # 2. stem (e.g. "auth")
-    # 3. dotted path (e.g. "src.auth")
     file_id_map = {}
     module_lookup = {}
     nodes_info = {}
@@ -90,15 +97,12 @@ def build_graph_data(directory: str = "test_project", output_file: str = "graph_
         file_id_map[rel_path] = rel_path
         
         stem = py_file.stem
-        # Map stem (e.g. 'auth') -> rel_path
         if stem not in module_lookup:
             module_lookup[stem] = rel_path
             
-        # Map filename (e.g. 'auth.py') -> rel_path
         if py_file.name not in module_lookup:
             module_lookup[py_file.name] = rel_path
 
-        # Dotted module path (e.g. 'pkg.module')
         dotted = rel_path.replace(".py", "").replace("/", ".")
         module_lookup[dotted] = rel_path
 
@@ -106,7 +110,8 @@ def build_graph_data(directory: str = "test_project", output_file: str = "graph_
             "path": py_file,
             "rel_path": rel_path,
             "stem": stem,
-            "filename": py_file.name
+            "filename": py_file.name,
+            "is_test": is_test_file(rel_path, py_file.name)
         }
 
     raw_deps = {}
@@ -138,17 +143,31 @@ def build_graph_data(directory: str = "test_project", output_file: str = "graph_
                     outgoing_deps[source_file].append(target_file)
 
     nodes = []
+    critical_hub_count = 0
+
     for rel_path, info in nodes_info.items():
         in_count = incoming_counts[rel_path]
         out_count = outgoing_counts[rel_path]
+        is_critical = in_count >= 2
 
-        # Red for in_degree >= 2, Blue otherwise
-        color = "#ef4444" if in_count >= 2 else "#3b82f6"
-        node_size = 26 + min(in_count * 6, 30)
+        if is_critical:
+            critical_hub_count += 1
+            color = "#ef4444"
+            # Central bottlenecks appear larger and prominent
+            node_size = 34 + min((in_count - 2) * 5, 24)
+        elif in_count == 1:
+            color = "#3b82f6"
+            node_size = 27
+        else:
+            color = "#3b82f6"
+            # Leaf files stay smaller and cleaner
+            node_size = 22
 
         nodes.append({
             "id": rel_path,
             "label": info["filename"],
+            "rel_path": rel_path,
+            "is_test": info["is_test"],
             "color": color,
             "incoming_count": in_count,
             "outgoing_count": out_count,
@@ -166,7 +185,13 @@ def build_graph_data(directory: str = "test_project", output_file: str = "graph_
         "nodes": nodes,
         "edges": edges,
         "total_files": len(nodes),
-        "total_connections": len(edges)
+        "total_connections": len(edges),
+        "critical_hubs": critical_hub_count,
+        "stats": {
+            "total_files": len(nodes),
+            "total_connections": len(edges),
+            "critical_hubs": critical_hub_count
+        }
     }
 
     if output_file:
@@ -179,7 +204,7 @@ def build_graph_data(directory: str = "test_project", output_file: str = "graph_
 
 def main():
     graph_data = build_graph_data("test_project", "graph_data.json")
-    print(f"Graph data generated: {len(graph_data['nodes'])} nodes, {len(graph_data['edges'])} edges.")
+    print(f"Graph data generated: {len(graph_data['nodes'])} nodes, {len(graph_data['edges'])} edges, {graph_data['critical_hubs']} critical hubs.")
 
 
 if __name__ == "__main__":
