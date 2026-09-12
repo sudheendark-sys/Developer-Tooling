@@ -593,6 +593,72 @@ def blast_radius_endpoint():
     return jsonify(result)
 
 
+@app.route("/api/validate-delete", methods=["POST", "GET"])
+def validate_delete():
+    """Validate if a module can be safely deleted without breaking active production imports."""
+    if request.method == "POST":
+        data = request.get_json(force=True) if request.is_json else request.form
+        node_id = data.get("node_id") or data.get("filename") or "" if data else ""
+    else:
+        node_id = request.args.get("node_id") or request.args.get("filename") or ""
+
+    if not node_id:
+        return jsonify({"error": "node_id or filename is required"}), 400
+
+    project_dir = get_current_project_dir()
+    graph_data = build_graph_data(str(project_dir), None)
+
+    # Match target node ID in graph
+    target_node = None
+    node_meta = None
+    for n in graph_data.get("nodes", []):
+        if n["id"] == node_id or n["label"] == node_id or Path(n["id"]).name == node_id or n.get("rel_path") == node_id:
+            target_node = n["id"]
+            node_meta = n
+            break
+
+    if not target_node:
+        target_node = node_id
+
+    # Find direct callers / incoming dependencies
+    direct_callers = []
+    if node_meta and "incoming_dependencies" in node_meta:
+        direct_callers = [c for c in node_meta["incoming_dependencies"] if c != target_node]
+    else:
+        for edge in graph_data.get("edges", []):
+            if edge.get("to") == target_node:
+                src = edge.get("from")
+                if src and src not in direct_callers and src != target_node:
+                    direct_callers.append(src)
+
+    # Compute downstream cascade count
+    blast_info = calculate_blast_radius(target_node, graph_data)
+    cascade_count = blast_info.get("affected_count", len(direct_callers))
+    affected_nodes = blast_info.get("affected_nodes", direct_callers)
+
+    if len(direct_callers) == 0:
+        return jsonify({
+            "safe": True,
+            "node_id": target_node,
+            "filename": target_node,
+            "direct_callers": [],
+            "dependents": [],
+            "cascade_count": 0,
+            "message": "Safe to remove. No active production imports."
+        })
+    else:
+        return jsonify({
+            "safe": False,
+            "node_id": target_node,
+            "filename": target_node,
+            "direct_callers": direct_callers,
+            "dependents": direct_callers,
+            "affected_nodes": affected_nodes,
+            "cascade_count": cascade_count,
+            "message": f"Unsafe to delete. Referenced by {len(direct_callers)} active module(s)."
+        })
+
+
 @app.route("/api/git-history", methods=["GET"])
 def get_git_history():
     """Extract the last 5 git commits with hash, author, date, summary, and modified files."""

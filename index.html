@@ -500,6 +500,32 @@
           </button>
         </div>
 
+        <!-- Safe Deletion / Refactoring Validator Card -->
+        <div id="safe-delete-card" class="glass-card rounded-xl p-4 flex flex-col gap-2.5 shadow-lg border border-slate-700/50">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+              <i class="fa-solid fa-broom text-emerald-400"></i>
+              <span>🧹 Safe Deletion Check</span>
+            </span>
+            <span id="delete-status-pill" class="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+              Unverified
+            </span>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Verify if this module can be safely removed or refactored without breaking active imports or cascades.
+          </p>
+          <button 
+            id="btn-verify-delete" 
+            class="w-full py-2 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
+          >
+            <i class="fa-solid fa-shield-halved text-xs"></i>
+            <span>Verify Safe to Delete</span>
+          </button>
+
+          <!-- Safe Deletion Result Container (Dynamic) -->
+          <div id="delete-validation-result" class="hidden mt-1 flex flex-col gap-2"></div>
+        </div>
+
         <!-- Inbound Dependencies (Imported By) -->
         <div class="glass-card rounded-xl p-3 flex flex-col gap-2">
           <div class="flex items-center justify-between text-xs">
@@ -911,6 +937,23 @@
       const outboundCount = document.getElementById('outbound-count-badge');
       const btnBlast = document.getElementById('btn-blast-radius');
       const btnOutage = document.getElementById('btn-simulate-outage');
+      const btnVerifyDelete = document.getElementById('btn-verify-delete');
+      const deleteResultEl = document.getElementById('delete-validation-result');
+      const deleteStatusPill = document.getElementById('delete-status-pill');
+
+      if (deleteResultEl) {
+        deleteResultEl.innerHTML = '';
+        deleteResultEl.classList.add('hidden');
+      }
+      if (deleteStatusPill) {
+        deleteStatusPill.textContent = 'Unverified';
+        deleteStatusPill.className = 'text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700';
+      }
+      if (btnVerifyDelete) {
+        btnVerifyDelete.disabled = false;
+        btnVerifyDelete.innerHTML = `<i class="fa-solid fa-shield-halved text-xs"></i> <span>Verify Safe to Delete</span>`;
+        btnVerifyDelete.onclick = () => runSafeDeleteValidation(nodeId);
+      }
 
       if (emptyState) emptyState.classList.add('hidden');
       if (activeState) activeState.classList.remove('hidden');
@@ -1029,10 +1072,115 @@
       const emptyState = document.getElementById('inspector-empty-state');
       const activeState = document.getElementById('inspector-active-state');
       const matchBanner = document.getElementById('query-match-banner');
+      const deleteResultEl = document.getElementById('delete-validation-result');
+      const deleteStatusPill = document.getElementById('delete-status-pill');
 
       if (emptyState) emptyState.classList.remove('hidden');
       if (activeState) activeState.classList.add('hidden');
       if (matchBanner) matchBanner.classList.add('hidden');
+      if (deleteResultEl) {
+        deleteResultEl.innerHTML = '';
+        deleteResultEl.classList.add('hidden');
+      }
+      if (deleteStatusPill) {
+        deleteStatusPill.textContent = 'Unverified';
+        deleteStatusPill.className = 'text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700';
+      }
+    }
+
+    // Safe Deletion / Refactoring Validator Engine
+    async function runSafeDeleteValidation(nodeId) {
+      const resultContainer = document.getElementById('delete-validation-result');
+      const statusPill = document.getElementById('delete-status-pill');
+      const btn = document.getElementById('btn-verify-delete');
+      if (!resultContainer) return;
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin text-xs"></i> <span>Checking dependencies...</span>`;
+      }
+
+      try {
+        const response = await fetch('/api/validate-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ node_id: nodeId })
+        });
+        
+        const data = await response.json();
+        resultContainer.classList.remove('hidden');
+
+        if (data.safe) {
+          if (statusPill) {
+            statusPill.textContent = 'Safe';
+            statusPill.className = 'text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold';
+          }
+          resultContainer.innerHTML = `
+            <div class="p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/50 flex flex-col gap-2 shadow-inner">
+              <div class="flex items-center gap-2 text-emerald-300 font-semibold text-xs">
+                <i class="fa-solid fa-circle-check text-emerald-400 text-sm"></i>
+                <span>✅ Safe to Remove (0 Dependents)</span>
+              </div>
+              <p class="text-[11px] text-emerald-200/90 leading-relaxed">
+                No active modules in the project import this file. It can be safely pruned from the codebase.
+              </p>
+              <div class="flex items-center justify-between bg-slate-950/80 border border-emerald-500/30 rounded-lg px-2.5 py-1.5 mt-1 font-mono text-[11px] text-emerald-300">
+                <span class="truncate">git rm ${nodeId}</span>
+                <button 
+                  onclick="navigator.clipboard.writeText('git rm ${nodeId}'); showToast('Copied: git rm ${nodeId}')" 
+                  class="text-emerald-400 hover:text-white p-1 ml-2 text-xs transition-colors"
+                  title="Copy git rm command"
+                >
+                  <i class="fa-regular fa-copy"></i>
+                </button>
+              </div>
+            </div>
+          `;
+          showToast(`✅ ${nodeId} is safe to remove.`);
+        } else {
+          const callers = data.direct_callers || data.dependents || [];
+          const cascadeCount = data.cascade_count || callers.length;
+
+          if (statusPill) {
+            statusPill.textContent = 'Blocked';
+            statusPill.className = 'text-[9px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold';
+          }
+          resultContainer.innerHTML = `
+            <div class="p-3 rounded-xl bg-rose-950/60 border border-rose-500/50 flex flex-col gap-2.5 shadow-inner">
+              <div class="flex items-center gap-2 text-rose-300 font-semibold text-xs">
+                <i class="fa-solid fa-triangle-exclamation text-rose-400 text-sm animate-pulse"></i>
+                <span>⚠️ Deletion Blocked: Referenced by ${callers.length} active module(s)</span>
+              </div>
+              <p class="text-[11px] text-rose-200/90 leading-relaxed">
+                Deleting this file will cause cascading breakages in ${cascadeCount} downstream component(s).
+              </p>
+              <div class="flex flex-col gap-1.5 mt-0.5">
+                <span class="text-[10px] font-bold text-rose-300 uppercase tracking-wider">Direct Callers (Click to Focus):</span>
+                <div class="flex flex-wrap gap-1.5">
+                  ${callers.map(caller => `
+                    <button 
+                      onclick="focusAndInspectNode('${caller}')"
+                      class="px-2 py-1 bg-rose-900/60 hover:bg-rose-800 border border-rose-500/40 hover:border-rose-400 text-rose-200 text-[11px] font-mono rounded-lg transition-all flex items-center gap-1 active:scale-95 shadow-sm"
+                    >
+                      <i class="fa-regular fa-file-code text-[10px] text-rose-400"></i>
+                      <span>${caller}</span>
+                    </button>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+          `;
+          showToast(`⚠️ Deletion blocked: ${nodeId} is referenced by ${callers.length} file(s).`, "error");
+        }
+      } catch (err) {
+        console.error("Safe delete validation error:", err);
+        showToast("Validation check failed.", true);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<i class="fa-solid fa-shield-halved text-xs"></i> <span>Verify Safe to Delete</span>`;
+        }
+      }
     }
 
     // Focus on a specific node and inspect
