@@ -392,8 +392,8 @@ Respond ONLY with JSON matching:
         }
 
     return {
-        "target_node": files_context[0]["rel_path"] if files_context else "app.py",
-        "reason": "Closest match based on project architecture index."
+        "target_node": None,
+        "reason": "No matching module found in project architecture."
     }
 
 

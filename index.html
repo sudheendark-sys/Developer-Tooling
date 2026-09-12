@@ -570,15 +570,16 @@
       const existing = document.getElementById('global-toast');
       if (existing) existing.remove();
 
+      const isErr = isError === true || isError === 'error';
       const toast = document.createElement('div');
       toast.id = 'global-toast';
       toast.className = `fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl text-xs font-medium backdrop-blur-md shadow-2xl flex items-center gap-2 border transition-all ${
-        isError 
-          ? 'bg-rose-950/90 border-rose-500/60 text-rose-200' 
+        isErr 
+          ? 'bg-rose-950/90 border-rose-500/60 text-rose-200 shadow-rose-950/50' 
           : 'bg-slate-900/90 border-blue-500/60 text-slate-100'
       }`;
       toast.innerHTML = `
-        <i class="fa-solid ${isError ? 'fa-triangle-exclamation text-rose-400' : 'fa-sparkles text-blue-400'}"></i>
+        <i class="fa-solid ${isErr ? 'fa-triangle-exclamation text-rose-400' : 'fa-sparkles text-blue-400'}"></i>
         <span>${message}</span>
       `;
       document.body.appendChild(toast);
@@ -1853,8 +1854,8 @@
       }
     }
 
-    // Robust Node Search & Partial/Fuzzy Matching
-    async function executeNodeSearch() {
+    // Robust Node Search & Strict Matching
+    function executeNodeSearch() {
       const searchInput = document.getElementById("search-input") || document.getElementById("search-query") || document.querySelector("input[placeholder*='Ask codebase']");
       if (!searchInput) return;
 
@@ -1866,66 +1867,43 @@
 
       const allNodes = (nodesDataSet ? nodesDataSet.get() : []) || [];
       
-      // 1. Match by exact id, label, or stem
-      let match = allNodes.find(n => {
+      // Match by exact id, label, or path substring
+      const match = allNodes.find(n => {
         const label = (n.label || "").toLowerCase();
         const id = (n.id || "").toLowerCase();
-        const cleanQuery = query.replace(/\.py$/, '');
-        return label === query || id === query || label.replace(/\.py$/, '') === cleanQuery || id.replace(/\.py$/, '') === cleanQuery;
+        return label.includes(query) || id.includes(query);
       });
 
-      // 2. Match by label or id substring
-      if (!match) {
-        match = allNodes.find(n => {
-          const label = (n.label || "").toLowerCase();
-          const id = (n.id || "").toLowerCase();
-          return label.includes(query) || id.includes(query);
-        });
-      }
-
-      // 3. Fallback to API query ranking if no direct substring match
-      let matchReason = `Matched query '${query}'`;
-      if (!match) {
-        try {
-          const apiResult = await queryArchitectureApi(rawQuery);
-          if (apiResult && apiResult.target_node) {
-            match = allNodes.find(n => n.id === apiResult.target_node || n.label === apiResult.target_node);
-            if (apiResult.reason) matchReason = apiResult.reason;
-          }
-        } catch (e) {
-          console.warn("API query search fallback error:", e);
-        }
-      }
-
       if (match) {
+        // Exact or substring match found
         currentlySelectedNodeId = match.id;
-
-        // 1. Select the node in vis-network
         if (network) {
           network.selectNodes([match.id]);
-
-          // 2. Smoothly animate camera to center and zoom in
           network.focus(match.id, {
             scale: 1.25,
-            animation: {
-              duration: 700,
-              easingFunction: "easeInOutQuad"
-            }
+            animation: { duration: 600, easingFunction: "easeInOutQuad" }
           });
         }
-
         highlightAndPulseNode(match.id);
-
-        // 3. Open Module Inspector for the found module
         if (typeof openModuleInspector === "function") {
-          openModuleInspector(match.id, matchReason);
+          openModuleInspector(match.id, `Matched '${query}'`);
         }
         showToast(`Found module: ${match.label || match.id}`);
       } else {
-        // Visual feedback for no match found
-        searchInput.classList.add("border-red-500", "ring-2", "ring-red-500/40");
-        setTimeout(() => searchInput.classList.remove("border-red-500", "ring-2", "ring-red-500/40"), 1500);
-        showToast(`No matching module found for "${rawQuery}"`, true);
+        // NO MATCH: Do NOT move camera, do NOT select any node
+        if (network) {
+          network.unselectAll();
+        }
+        clearPulse();
+
+        // Show clear UI feedback
+        showToast(`❌ No module found matching "${query}"`, "error");
+
+        // Flash the search box red
+        searchInput.classList.add("ring-2", "ring-rose-500", "border-rose-500");
+        setTimeout(() => {
+          searchInput.classList.remove("ring-2", "ring-rose-500", "border-rose-500");
+        }, 2000);
       }
     }
 
