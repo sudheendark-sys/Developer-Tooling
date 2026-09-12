@@ -2,23 +2,37 @@ import ast
 import json
 import os
 import re
+import shutil
+import subprocess
 import urllib.error
 import urllib.request
 from collections import deque
 from pathlib import Path
 from flask import Flask, jsonify, request, send_from_directory
 
-from scan import build_graph_data
+from scan import build_graph_data, find_all_py_files
 
 app = Flask(__name__, static_folder=".")
 BASE_DIR = Path(__file__).resolve().parent
-PROJECT_DIR = BASE_DIR / "test_project"
+CLONED_REPOS_DIR = BASE_DIR / "cloned_repos"
+CLONED_REPOS_DIR.mkdir(exist_ok=True)
+
+# Active project directory state (defaults to test_project)
+CURRENT_PROJECT_DIR = BASE_DIR / "test_project"
+CURRENT_REPO_NAME = "test_project"
+
+
+def get_current_project_dir() -> Path:
+    global CURRENT_PROJECT_DIR
+    if not CURRENT_PROJECT_DIR.exists():
+        CURRENT_PROJECT_DIR = BASE_DIR / "test_project"
+    return CURRENT_PROJECT_DIR
 
 
 def get_ast_details(file_path: Path):
     """Extract functions, classes, docstrings, and full source from a Python file."""
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
             source = f.read()
         tree = ast.parse(source, filename=str(file_path))
 
@@ -36,12 +50,36 @@ def get_ast_details(file_path: Path):
         return {"source": "", "functions": [], "classes": [], "docstring": "", "error": str(e)}
 
 
+def resolve_file_in_project(identifier: str, project_dir: Path) -> Path | None:
+    """Find a Python file in project directory by relative path, filename, or stem."""
+    # 1. Direct path check
+    direct = project_dir / identifier
+    if direct.exists() and direct.is_file():
+        return direct
+
+    # 2. Add .py if omitted
+    if not identifier.endswith(".py"):
+        with_py = project_dir / f"{identifier}.py"
+        if with_py.exists() and with_py.is_file():
+            return with_py
+
+    # 3. Search by filename across project
+    target_name = Path(identifier).name
+    if not target_name.endswith(".py"):
+        target_name += ".py"
+
+    for py_file in find_all_py_files(project_dir):
+        if py_file.name == target_name:
+            return py_file
+
+    return None
+
+
 def calculate_blast_radius(target_file: str, graph_data: dict):
     """Calculate all directly and transitively affected downstream files if target_file breaks."""
     edges = graph_data.get("edges", [])
     nodes = graph_data.get("nodes", [])
 
-    # Map of target -> list of sources that import target (direct dependents)
     dependents_map = {n["id"]: [] for n in nodes}
     for edge in edges:
         src = edge.get("from")
@@ -49,7 +87,6 @@ def calculate_blast_radius(target_file: str, graph_data: dict):
         if dst in dependents_map:
             dependents_map[dst].append(src)
 
-    # Breadth-first search for all downstream affected modules
     queue = deque([target_file])
     visited = set()
     affected = set()
@@ -96,7 +133,11 @@ def generate_heuristic_explanation(filename: str, source: str, ast_info: dict, n
         risk_score = 1
         risk_level = "Low"
 
-    stem = filename.replace(".py", "")
+    funcs = ast_info.get("functions", [])
+    classes = ast_info.get("classes", [])
+    docstring = ast_info.get("docstring", "")
+
+    stem = Path(filename).stem
     if stem == "database":
         summary = (
             "Provides core database connectivity and state simulation via get_db(). "
@@ -115,7 +156,7 @@ def generate_heuristic_explanation(filename: str, source: str, ast_info: dict, n
             f"Moderate impact: Directly consumed by {', '.join(incoming) if incoming else 'the main application'}. "
             "Modifications or syntax errors will disrupt authentication flows in dependent services."
         )
-    elif stem == "app":
+    elif stem == "app" and in_count == 0:
         summary = (
             "Acts as the primary entry point and orchestrator for the application, "
             "initializing database connections and triggering authentication routines."
@@ -125,26 +166,30 @@ def generate_heuristic_explanation(filename: str, source: str, ast_info: dict, n
             "Changes will only affect application startup and top-level execution flow."
         )
     else:
-        funcs = ast_info.get("functions", [])
-        classes = ast_info.get("classes", [])
+        # Dynamic contextual explanation for cloned repos
         members = []
-        if funcs:
-            members.append(f"functions: {', '.join(funcs)}")
         if classes:
-            members.append(f"classes: {', '.join(classes)}")
-        member_desc = f" ({'; '.join(members)})" if members else ""
+            members.append(f"classes: {', '.join(classes[:3])}")
+        if funcs:
+            members.append(f"functions: {', '.join(funcs[:4])}")
+        member_desc = f" containing {'; '.join(members)}" if members else ""
 
-        summary = (
-            f"Module '{filename}' provides logic{member_desc}. "
-            f"It imports {len(outgoing)} module(s) and is imported by {in_count} module(s)."
-        )
+        if docstring:
+            first_line = docstring.strip().split("\n")[0]
+            summary = f"{first_line} Module '{filename}'{member_desc}."
+        else:
+            summary = (
+                f"Module '{filename}' provides core project functionality{member_desc}. "
+                f"It imports {len(outgoing)} module(s) and is imported by {in_count} module(s)."
+            )
+
         if in_count > 0:
             blast_radius = (
-                f"Affects {in_count} downstream dependent file(s): {', '.join(incoming)}. "
-                "Ensure API compatibility to avoid breaking caller modules."
+                f"Directly affects {in_count} downstream dependent module(s): {', '.join(incoming[:5])}. "
+                "Ensure API and signature backwards compatibility before modifying."
             )
         else:
-            blast_radius = "Isolated module with 0 downstream dependents. Safe to modify with minimal cascade risk."
+            blast_radius = "Isolated or top-level entry module with 0 downstream dependents. Safe to modify with minimal cascade risk."
 
     return {
         "filename": filename,
@@ -152,7 +197,7 @@ def generate_heuristic_explanation(filename: str, source: str, ast_info: dict, n
         "risk_score": risk_score,
         "risk_level": risk_level,
         "blast_radius_warning": blast_radius,
-        "provider": "Local Heuristic Engine"
+        "provider": "Local Architecture Engine"
     }
 
 
@@ -162,13 +207,16 @@ def call_gemini_explain(api_key: str, filename: str, source: str, node_meta: dic
     outgoing = node_meta.get("outgoing_dependencies", [])
     in_count = len(incoming)
 
+    # Truncate source if extremely large
+    truncated_source = source[:4000] if len(source) > 4000 else source
+
     prompt = f"""You are an expert software architecture and dependency analysis AI.
 Analyze the following Python file from a project repository.
 
 File: {filename}
 Code:
 ```python
-{source}
+{truncated_source}
 ```
 
 Dependency Context:
@@ -216,8 +264,8 @@ def find_best_matching_node(query: str, files_context: list, api_key: str = ""):
     if api_key:
         try:
             files_desc = "\n\n".join([
-                f"File: {fc['filename']}\nFunctions: {fc['functions']}\nDocstring: {fc['docstring']}\nCode:\n{fc['source']}"
-                for fc in files_context
+                f"File: {fc['rel_path']}\nFunctions: {fc['functions'][:5]}\nDocstring: {fc['docstring'][:150]}\nCode Snippet:\n{fc['source'][:500]}"
+                for fc in files_context[:25]
             ])
             prompt = f"""You are RepoNavigator's architecture code search assistant.
 User Question / Query: "{clean_query}"
@@ -228,7 +276,7 @@ Project Files:
 Identify the single most relevant file for this query and explain why.
 Respond ONLY with JSON matching:
 {{
-  "target_node": "<exact_filename_like_database.py>",
+  "target_node": "<exact_file_id_like_auth.py>",
   "reason": "<one sentence explaining why this file is the match>"
 }}"""
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
@@ -254,62 +302,62 @@ Respond ONLY with JSON matching:
     tokens = re.findall(r"\w+", query_lower)
 
     synonyms = {
-        "database": ["db", "database", "get_db", "sql", "storage", "connection", "persistence", "data", "table", "store"],
-        "auth": ["auth", "authentication", "login", "user", "password", "token", "session", "credential", "logout", "signin"],
-        "app": ["app", "main", "entry", "start", "run", "entrypoint", "bootstrap", "orchestrator", "root"]
+        "database": ["db", "database", "get_db", "sql", "storage", "connection", "persistence", "data", "table", "store", "model", "schema"],
+        "auth": ["auth", "authentication", "login", "user", "password", "token", "session", "credential", "logout", "signin", "jwt", "oauth"],
+        "app": ["app", "main", "entry", "start", "run", "entrypoint", "bootstrap", "orchestrator", "root", "cli", "server"]
     }
 
     scores = {}
     reasons = {}
 
     for fc in files_context:
-        filename = fc["filename"]
-        stem = filename.replace(".py", "").lower()
-        source_lower = fc["source"].lower()
+        rel_path = fc["rel_path"]
+        stem = Path(rel_path).stem.lower()
+        source_lower = fc["source"][:3000].lower()
         funcs = [fn.lower() for fn in fc["functions"]]
         doc_lower = fc["docstring"].lower()
 
         score = 0
         match_details = []
 
-        if stem in query_lower or filename.lower() in query_lower:
+        if stem in query_lower or rel_path.lower() in query_lower:
             score += 15
-            match_details.append(f"matches file name '{filename}'")
+            match_details.append(f"matches file name '{rel_path}'")
 
         for fn in funcs:
-            if fn in query_lower:
+            if fn in query_lower or any(tok in fn for tok in tokens if len(tok) > 3):
                 score += 12
                 match_details.append(f"defines function '{fn}()'")
 
-        target_syns = synonyms.get(stem, [stem])
-        for syn in target_syns:
-            if syn in tokens or syn in query_lower:
-                score += 8
-                match_details.append(f"matches domain concept '{syn}'")
+        for concept, syn_list in synonyms.items():
+            if any(syn in tokens for syn in syn_list):
+                if concept in stem or any(syn in stem for syn in syn_list):
+                    score += 8
+                    match_details.append(f"matches concept '{concept}'")
 
         for token in tokens:
             if len(token) > 2 and token in source_lower:
-                score += 3
+                score += 2
             if len(token) > 2 and token in doc_lower:
                 score += 4
 
-        scores[filename] = score
+        scores[rel_path] = score
         if match_details:
-            reasons[filename] = f"Matches {', '.join(match_details[:2])}."
+            reasons[rel_path] = f"Matches {', '.join(match_details[:2])}."
         else:
-            reasons[filename] = f"Matched keywords in {filename}."
+            reasons[rel_path] = f"Matched keywords in {rel_path}."
 
-    best_file = max(scores, key=scores.get)
-    if scores[best_file] > 0:
-        stem = best_file.replace(".py", "")
+    best_file = max(scores, key=scores.get) if scores else None
+    if best_file and scores[best_file] > 0:
+        stem = Path(best_file).stem
         if stem == "database":
-            final_reason = "Handles database connections, queries, and data persistence logic."
+            final_reason = "Handles database connections, queries, and persistence."
         elif stem == "auth":
-            final_reason = "Handles user authentication, login validation, and credential checks."
+            final_reason = "Handles user authentication, login validation, and credentials."
         elif stem == "app":
-            final_reason = "Main entrypoint orchestrating application execution and services."
+            final_reason = "Main entrypoint orchestrating application execution."
         else:
-            final_reason = reasons.get(best_file, f"Highest relevance score for '{query}' in {best_file}.")
+            final_reason = reasons.get(best_file, f"Highest relevance score for query in {best_file}.")
 
         return {
             "target_node": best_file,
@@ -318,10 +366,12 @@ Respond ONLY with JSON matching:
         }
 
     return {
-        "target_node": files_context[0]["filename"] if files_context else "app.py",
+        "target_node": files_context[0]["rel_path"] if files_context else "app.py",
         "reason": "Closest match based on project architecture index."
     }
 
+
+# ---------------- HTTP ENDPOINTS ----------------
 
 @app.route("/")
 @app.route("/index.html")
@@ -331,16 +381,82 @@ def serve_index():
 
 @app.route("/graph_data.json")
 def serve_graph_data():
+    project_dir = get_current_project_dir()
     graph_file = BASE_DIR / "graph_data.json"
-    if not graph_file.exists():
-        build_graph_data("test_project", "graph_data.json")
-    return send_from_directory(BASE_DIR, "graph_data.json")
+    data = build_graph_data(str(project_dir), str(graph_file))
+    return jsonify(data)
 
 
 @app.route("/api/graph", methods=["GET"])
 def get_graph():
-    data = build_graph_data("test_project", "graph_data.json")
+    project_dir = get_current_project_dir()
+    data = build_graph_data(str(project_dir), str(BASE_DIR / "graph_data.json"))
+    data["repo_name"] = CURRENT_REPO_NAME
+    data["project_dir"] = str(project_dir)
     return jsonify(data)
+
+
+@app.route("/api/clone-and-scan", methods=["POST"])
+def clone_and_scan():
+    """Clone a public GitHub repository and dynamically scan its dependency architecture."""
+    global CURRENT_PROJECT_DIR, CURRENT_REPO_NAME
+    data = request.get_json(force=True) if request.is_json else request.form
+    repo_url = data.get("repo_url", "").strip() if data else ""
+
+    if not repo_url:
+        return jsonify({"error": "Repository URL is required"}), 400
+
+    # Sanitize repo URL and name
+    clean_url = repo_url.rstrip("/")
+    if clean_url.endswith(".git"):
+        clean_url = clean_url[:-4]
+    
+    repo_name = clean_url.split("/")[-1]
+    if not repo_name:
+        repo_name = "cloned_repo"
+
+    target_dir = CLONED_REPOS_DIR / repo_name
+
+    try:
+        # If already cloned, remove or pull fresh
+        if target_dir.exists():
+            shutil.rmtree(target_dir, ignore_errors=True)
+
+        print(f"Cloning {repo_url} into {target_dir}...")
+        clone_cmd = ["git", "clone", "--depth", "1", repo_url, str(target_dir)]
+        process = subprocess.run(
+            clone_cmd,
+            capture_output=True,
+            text=True,
+            timeout=90
+        )
+
+        if process.returncode != 0:
+            error_msg = process.stderr.strip() or "Failed to clone repository."
+            return jsonify({"error": f"Git clone failed: {error_msg}"}), 400
+
+        # Update active project directory
+        CURRENT_PROJECT_DIR = target_dir
+        CURRENT_REPO_NAME = repo_name
+
+        # Scan new repository
+        graph_data = build_graph_data(str(target_dir), str(BASE_DIR / "graph_data.json"))
+
+        return jsonify({
+            "success": True,
+            "repo_name": repo_name,
+            "repo_url": repo_url,
+            "project_dir": str(target_dir),
+            "nodes": graph_data["nodes"],
+            "edges": graph_data["edges"],
+            "total_files": graph_data.get("total_files", len(graph_data["nodes"])),
+            "total_connections": graph_data.get("total_connections", len(graph_data["edges"]))
+        })
+
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": "Git clone timed out after 90 seconds."}), 504
+    except Exception as e:
+        return jsonify({"error": f"An error occurred while cloning: {str(e)}"}), 500
 
 
 @app.route("/api/explain", methods=["POST"])
@@ -351,14 +467,20 @@ def explain_file():
     if not filename:
         return jsonify({"error": "No filename provided"}), 400
 
-    clean_filename = Path(filename).name
-    file_path = PROJECT_DIR / clean_filename
+    project_dir = get_current_project_dir()
+    file_path = resolve_file_in_project(filename, project_dir)
 
-    if not file_path.exists():
-        return jsonify({"error": f"File '{clean_filename}' not found in test_project/"}), 404
+    if not file_path or not file_path.exists():
+        return jsonify({"error": f"File '{filename}' not found in {CURRENT_REPO_NAME}."}), 404
 
-    graph_data = build_graph_data("test_project", "graph_data.json")
-    node_meta = next((n for n in graph_data["nodes"] if n["id"] == clean_filename), {})
+    graph_data = build_graph_data(str(project_dir), None)
+    rel_path = file_path.relative_to(project_dir).as_posix()
+    
+    # Match node metadata
+    node_meta = next(
+        (n for n in graph_data["nodes"] if n["id"] == rel_path or n["id"] == filename or n["label"] == file_path.name),
+        {"incoming_dependencies": [], "outgoing_dependencies": [], "incoming_count": 0, "outgoing_count": 0}
+    )
 
     ast_info = get_ast_details(file_path)
     source_code = ast_info["source"]
@@ -366,18 +488,18 @@ def explain_file():
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if gemini_key:
         try:
-            explanation = call_gemini_explain(gemini_key, clean_filename, source_code, node_meta)
+            explanation = call_gemini_explain(gemini_key, rel_path, source_code, node_meta)
             explanation["incoming_dependencies"] = node_meta.get("incoming_dependencies", [])
             explanation["outgoing_dependencies"] = node_meta.get("outgoing_dependencies", [])
-            explanation["file_path"] = f"test_project/{clean_filename}"
+            explanation["file_path"] = f"{CURRENT_REPO_NAME}/{rel_path}"
             return jsonify(explanation)
         except Exception as e:
             print(f"Gemini API call failed, falling back to heuristic: {e}")
 
-    explanation = generate_heuristic_explanation(clean_filename, source_code, ast_info, node_meta)
+    explanation = generate_heuristic_explanation(rel_path, source_code, ast_info, node_meta)
     explanation["incoming_dependencies"] = node_meta.get("incoming_dependencies", [])
     explanation["outgoing_dependencies"] = node_meta.get("outgoing_dependencies", [])
-    explanation["file_path"] = f"test_project/{clean_filename}"
+    explanation["file_path"] = f"{CURRENT_REPO_NAME}/{rel_path}"
     return jsonify(explanation)
 
 
@@ -390,11 +512,12 @@ def query_architecture():
     if not query.strip():
         return jsonify({"error": "Query cannot be empty"}), 400
 
-    py_files = sorted(PROJECT_DIR.glob("*.py"))
+    project_dir = get_current_project_dir()
+    py_files = find_all_py_files(project_dir)
     files_context = []
     for f in py_files:
         info = get_ast_details(f)
-        info["filename"] = f.name
+        info["rel_path"] = f.relative_to(project_dir).as_posix()
         files_context.append(info)
 
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -405,22 +528,27 @@ def query_architecture():
 
 @app.route("/api/blast-radius", methods=["POST"])
 def blast_radius_endpoint():
-    """Calculate downstream dependency blast radius for a given target file."""
+    """Calculate downstream dependency blast radius for a target file in active project."""
     data = request.get_json(force=True) if request.is_json else request.form
     filename = data.get("filename", "") if data else ""
 
     if not filename:
         return jsonify({"error": "No filename provided"}), 400
 
-    clean_filename = Path(filename).name
-    graph_data = build_graph_data("test_project", "graph_data.json")
+    project_dir = get_current_project_dir()
+    graph_data = build_graph_data(str(project_dir), None)
 
-    # Verify node exists in graph
-    node_exists = any(n["id"] == clean_filename for n in graph_data.get("nodes", []))
-    if not node_exists:
-        return jsonify({"error": f"File '{clean_filename}' not found in dependency graph."}), 404
+    # Match target node ID in graph
+    target_node = None
+    for n in graph_data.get("nodes", []):
+        if n["id"] == filename or n["label"] == filename or Path(n["id"]).name == filename:
+            target_node = n["id"]
+            break
 
-    result = calculate_blast_radius(clean_filename, graph_data)
+    if not target_node:
+        target_node = filename
+
+    result = calculate_blast_radius(target_node, graph_data)
     return jsonify(result)
 
 

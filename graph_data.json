@@ -1,15 +1,31 @@
 {
   "nodes": [
     {
-      "id": "app.py",
-      "label": "app.py",
+      "id": "scan.py",
+      "label": "scan.py",
+      "color": "#3b82f6",
+      "incoming_count": 1,
+      "outgoing_count": 0,
+      "incoming_dependencies": [
+        "server.py"
+      ],
+      "outgoing_dependencies": [],
+      "size": 32,
+      "font": {
+        "color": "#f8fafc",
+        "size": 14,
+        "face": "Inter, system-ui, sans-serif"
+      }
+    },
+    {
+      "id": "server.py",
+      "label": "server.py",
       "color": "#3b82f6",
       "incoming_count": 0,
-      "outgoing_count": 2,
+      "outgoing_count": 1,
       "incoming_dependencies": [],
       "outgoing_dependencies": [
-        "auth.py",
-        "database.py"
+        "scan.py"
       ],
       "size": 26,
       "font": {
@@ -19,18 +35,17 @@
       }
     },
     {
-      "id": "auth.py",
-      "label": "auth.py",
+      "id": "test_project/app.py",
+      "label": "app.py",
       "color": "#3b82f6",
-      "incoming_count": 1,
-      "outgoing_count": 1,
-      "incoming_dependencies": [
-        "app.py"
-      ],
+      "incoming_count": 0,
+      "outgoing_count": 2,
+      "incoming_dependencies": [],
       "outgoing_dependencies": [
-        "database.py"
+        "test_project/auth.py",
+        "test_project/database.py"
       ],
-      "size": 34,
+      "size": 26,
       "font": {
         "color": "#f8fafc",
         "size": 14,
@@ -38,17 +53,36 @@
       }
     },
     {
-      "id": "database.py",
+      "id": "test_project/auth.py",
+      "label": "auth.py",
+      "color": "#3b82f6",
+      "incoming_count": 1,
+      "outgoing_count": 1,
+      "incoming_dependencies": [
+        "test_project/app.py"
+      ],
+      "outgoing_dependencies": [
+        "test_project/database.py"
+      ],
+      "size": 32,
+      "font": {
+        "color": "#f8fafc",
+        "size": 14,
+        "face": "Inter, system-ui, sans-serif"
+      }
+    },
+    {
+      "id": "test_project/database.py",
       "label": "database.py",
       "color": "#ef4444",
       "incoming_count": 2,
       "outgoing_count": 0,
       "incoming_dependencies": [
-        "app.py",
-        "auth.py"
+        "test_project/app.py",
+        "test_project/auth.py"
       ],
       "outgoing_dependencies": [],
-      "size": 42,
+      "size": 38,
       "font": {
         "color": "#f8fafc",
         "size": 14,
@@ -58,19 +92,26 @@
   ],
   "edges": [
     {
-      "from": "app.py",
-      "to": "auth.py",
+      "from": "server.py",
+      "to": "scan.py",
       "arrows": "to"
     },
     {
-      "from": "app.py",
-      "to": "database.py",
+      "from": "test_project/app.py",
+      "to": "test_project/auth.py",
       "arrows": "to"
     },
     {
-      "from": "auth.py",
-      "to": "database.py",
+      "from": "test_project/app.py",
+      "to": "test_project/database.py",
+      "arrows": "to"
+    },
+    {
+      "from": "test_project/auth.py",
+      "to": "test_project/database.py",
       "arrows": "to"
     }
-  ]
+  ],
+  "total_files": 5,
+  "total_connections": 4
 }

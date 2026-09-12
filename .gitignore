@@ -19,3 +19,6 @@ ENV/
 # IDEs
 .idea/
 .vscode/
+
+# Cloned Repositories for dynamic analysis
+cloned_repos/
