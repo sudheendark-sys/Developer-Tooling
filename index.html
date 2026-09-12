@@ -1,1077 +1,431 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RepoNavigator | Interactive Dependency & Architecture Explorer</title>
+  <title>RepoNavigator AI | Glassmorphic Architecture Visualizer</title>
   <meta name="description" content="State-of-the-art interactive codebase architecture visualizer, dependency blast-radius simulator, and AI code explainer." />
-  
-  <!-- Google Fonts & Vis Network CDN -->
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            },
+            canvas: '#0b0f19',
+          },
+          animation: {
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'spin-fast': 'spin 0.7s linear infinite',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <!-- Vis Network CDN -->
   <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 
   <style>
-    :root {
-      --bg-dark: #080c14;
-      --bg-surface: rgba(15, 23, 42, 0.9);
-      --bg-card: rgba(30, 41, 59, 0.65);
-      --border-color: rgba(148, 163, 184, 0.16);
-      --border-active: rgba(99, 102, 241, 0.55);
-      --text-primary: #f8fafc;
-      --text-secondary: #94a3b8;
-      --text-muted: #64748b;
-      --accent-blue: #3b82f6;
-      --accent-red: #ef4444;
-      --accent-orange: #f97316;
-      --accent-purple: #8b5cf6;
-      --accent-emerald: #10b981;
-      --accent-amber: #f59e0b;
-      --accent-cyan: #06b6d4;
-      --sidebar-width: 430px;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      background: radial-gradient(circle at top left, #0f172a, #020617 85%);
-      color: var(--text-primary);
-      height: 100vh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* Modern Unified Top Bar */
-    header {
-      height: 70px;
-      padding: 0 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      background: rgba(10, 15, 30, 0.92);
-      backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--border-color);
-      z-index: 20;
-    }
-
-    /* Brand Section */
-    .brand-section {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-shrink: 0;
-    }
-
-    .logo-icon {
-      width: 36px;
-      height: 36px;
-      background: linear-gradient(135deg, #6366f1, #3b82f6);
-      border-radius: 9px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 0 16px rgba(99, 102, 241, 0.45);
-    }
-
-    .logo-icon svg {
-      width: 18px;
-      height: 18px;
-      stroke: #fff;
-    }
-
-    .brand-title {
-      font-size: 1.05rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      background: linear-gradient(90deg, #ffffff, #cbd5e1);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .active-repo-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      background: rgba(30, 41, 59, 0.85);
-      border: 1px solid var(--border-color);
-      padding: 2px 8px;
-      border-radius: 6px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.7rem;
-      color: #93c5fd;
-      max-width: 140px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    /* Center Ingestion & Search Tools */
-    .header-tools {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      max-width: 860px;
-    }
-
-    /* GitHub Ingestion Input */
-    .clone-box {
-      flex: 1.1;
-      position: relative;
-      display: flex;
-      align-items: center;
-    }
-
-    .github-icon {
-      position: absolute;
-      left: 12px;
-      width: 15px;
-      height: 15px;
-      fill: var(--text-secondary);
-      pointer-events: none;
-    }
-
-    .clone-input {
-      width: 100%;
-      height: 38px;
-      padding: 0 95px 0 34px;
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(148, 163, 184, 0.22);
-      border-radius: 8px;
-      color: #fff;
-      font-size: 0.8rem;
-      outline: none;
-      transition: all 0.2s ease;
-      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
-    }
-
-    .clone-input::placeholder {
-      color: var(--text-muted);
-      font-size: 0.78rem;
-    }
-
-    .clone-input:focus {
-      background: rgba(15, 23, 42, 0.98);
-      border-color: rgba(59, 130, 246, 0.6);
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-    }
-
-    .btn-clone {
-      position: absolute;
-      right: 4px;
-      background: linear-gradient(135deg, #2563eb, #3b82f6);
-      border: none;
-      color: #fff;
-      padding: 5px 10px;
-      border-radius: 6px;
-      font-size: 0.74rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      transition: all 0.2s ease;
-      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
-    }
-
-    .btn-clone:hover:not(:disabled) {
-      background: linear-gradient(135deg, #1d4ed8, #2563eb);
-      transform: translateY(-1px);
-    }
-
-    .btn-clone:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    /* Ask Architecture Search Bar */
-    .search-box {
-      flex: 1;
-      position: relative;
-      display: flex;
-      align-items: center;
-    }
-
-    .search-icon {
-      position: absolute;
-      left: 11px;
-      width: 14px;
-      height: 14px;
-      stroke: var(--text-secondary);
-      pointer-events: none;
-    }
-
-    .search-input {
-      width: 100%;
-      height: 38px;
-      padding: 0 88px 0 32px;
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(148, 163, 184, 0.22);
-      border-radius: 8px;
-      color: #fff;
-      font-size: 0.8rem;
-      outline: none;
-      transition: all 0.2s ease;
-      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
-    }
-
-    .search-input::placeholder {
-      color: var(--text-muted);
-      font-size: 0.78rem;
-    }
-
-    .search-input:focus {
-      background: rgba(15, 23, 42, 0.98);
-      border-color: rgba(99, 102, 241, 0.6);
-      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
-    }
-
-    .search-actions-group {
-      position: absolute;
-      right: 4px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .shortcut-badge {
-      font-size: 0.65rem;
-      font-family: 'JetBrains Mono', monospace;
-      color: var(--text-muted);
-      background: rgba(30, 41, 59, 0.8);
-      border: 1px solid var(--border-color);
-      padding: 2px 5px;
-      border-radius: 4px;
-      pointer-events: none;
-    }
-
-    .btn-search {
-      background: linear-gradient(135deg, #4f46e5, #6366f1);
-      border: none;
-      color: #fff;
-      padding: 5px 9px;
-      border-radius: 5px;
-      font-size: 0.74rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      transition: all 0.2s ease;
-    }
-
-    .btn-search:hover {
-      background: linear-gradient(135deg, #4338ca, #4f46e5);
-      transform: translateY(-1px);
-    }
-
-    /* Top Right Action Controls */
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-shrink: 0;
-    }
-
-    .btn-nav {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      color: var(--text-primary);
-      padding: 6px 11px;
-      border-radius: 7px;
-      font-size: 0.76rem;
-      font-weight: 500;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .btn-nav:hover {
-      background: rgba(51, 65, 85, 0.8);
-      border-color: rgba(148, 163, 184, 0.35);
-      transform: translateY(-1px);
-    }
-
-    .btn-nav.active {
-      background: rgba(99, 102, 241, 0.2);
-      border-color: rgba(99, 102, 241, 0.6);
-      color: #c7d2fe;
-    }
-
-    /* Workspace Layout */
-    .main-container {
-      display: flex;
-      flex: 1;
-      height: calc(100vh - 70px);
-      position: relative;
-    }
-
-    /* Graph Canvas Area */
-    #graph-container {
-      flex: 1;
-      height: 100%;
-      background: radial-gradient(circle at center, rgba(30, 41, 59, 0.12) 0%, rgba(3, 7, 18, 0.95) 100%);
-      position: relative;
-      outline: none;
-    }
-
-    /* Bottom Architecture Stats HUD */
-    .hud-stats-badge {
-      position: absolute;
-      bottom: 20px;
-      left: 20px;
-      background: rgba(15, 23, 42, 0.88);
-      backdrop-filter: blur(16px);
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      padding: 8px 14px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-      z-index: 10;
-      font-size: 0.76rem;
-      color: var(--text-secondary);
-      pointer-events: auto;
-    }
-
-    .hud-stat-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .hud-stat-item strong {
-      color: #f8fafc;
-      font-weight: 700;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .hud-divider {
-      width: 1px;
-      height: 14px;
-      background: var(--border-color);
-    }
-
-    /* Floating Legend */
-    .canvas-legend {
-      position: absolute;
-      bottom: 66px;
-      left: 20px;
-      background: var(--bg-surface);
-      backdrop-filter: blur(16px);
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      padding: 10px 14px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-      z-index: 10;
-      pointer-events: auto;
-      max-width: 290px;
-    }
-
-    .legend-title {
-      font-size: 0.68rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-secondary);
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.76rem;
-      margin-bottom: 4px;
-      color: #e2e8f0;
-    }
-
-    .legend-item:last-child {
-      margin-bottom: 0;
-    }
-
-    .legend-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-
-    .legend-dot.red {
-      background: var(--accent-red);
-      box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
-    }
-
-    .legend-dot.orange {
-      background: var(--accent-orange);
-      box-shadow: 0 0 8px rgba(249, 115, 22, 0.8);
-    }
-
-    .legend-dot.blue {
-      background: var(--accent-blue);
-      box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
-    }
-
-    .legend-dot.dimmed {
-      background: #475569;
-      opacity: 0.4;
-    }
-
-    /* Floating Canvas Controls */
-    .canvas-controls {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      z-index: 10;
-    }
-
-    .control-btn {
-      width: 34px;
-      height: 34px;
-      background: var(--bg-surface);
-      backdrop-filter: blur(12px);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      color: var(--text-primary);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-    }
-
-    .control-btn:hover {
-      background: rgba(51, 65, 85, 0.9);
-      border-color: rgba(99, 102, 241, 0.5);
-      transform: scale(1.05);
-    }
-
-    /* Active Blast Mode Bar on Canvas */
-    .blast-active-banner {
-      position: absolute;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(234, 88, 12, 0.22);
-      backdrop-filter: blur(16px);
-      border: 1px solid rgba(249, 115, 22, 0.55);
-      border-radius: 10px;
-      padding: 8px 16px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      box-shadow: 0 8px 30px rgba(234, 88, 12, 0.3);
-      z-index: 12;
-      animation: bannerSlideIn 0.3s ease-out;
-    }
-
-    .blast-active-text {
-      font-size: 0.8rem;
-      color: #ffedd5;
-      font-weight: 500;
-    }
-
-    .blast-active-text strong {
-      color: #fed7aa;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .btn-reset-view {
-      background: rgba(30, 41, 59, 0.8);
-      border: 1px solid var(--border-color);
-      color: var(--text-secondary);
-      font-size: 0.74rem;
-      padding: 4px 10px;
-      border-radius: 6px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      transition: all 0.2s ease;
-    }
-
-    .btn-reset-view:hover {
-      background: rgba(51, 65, 85, 0.95);
-      color: #fff;
-    }
-
-    /* Toast Notification */
-    .toast-notification {
-      position: absolute;
-      top: 16px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(15, 23, 42, 0.95);
-      border: 1px solid rgba(59, 130, 246, 0.5);
-      border-radius: 10px;
-      padding: 9px 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      color: #e2e8f0;
-      font-size: 0.8rem;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-      z-index: 30;
-      animation: bannerSlideIn 0.3s ease-out;
-    }
-
-    /* Right Sidebar */
-    #sidebar {
-      width: var(--sidebar-width);
-      height: 100%;
-      background: var(--bg-surface);
-      backdrop-filter: blur(24px);
-      border-left: 1px solid var(--border-color);
-      display: flex;
-      flex-direction: column;
-      box-shadow: -10px 0 35px rgba(0, 0, 0, 0.35);
-      z-index: 15;
-      overflow-y: auto;
-    }
-
-    .sidebar-header {
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: rgba(15, 23, 42, 0.4);
-    }
-
-    .sidebar-header h2 {
-      font-size: 0.86rem;
-      font-weight: 700;
-      color: #e2e8f0;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      display: flex;
-      align-items: center;
-      gap: 7px;
-    }
-
-    .sidebar-content {
-      padding: 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-      flex: 1;
-    }
-
-    /* Search Match Banner */
-    .search-match-banner {
-      background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(16, 185, 129, 0.08));
-      border: 1px solid rgba(34, 197, 94, 0.35);
-      border-radius: 10px;
-      padding: 11px 13px;
-      display: flex;
-      align-items: flex-start;
-      gap: 9px;
-      box-shadow: 0 4px 14px rgba(34, 197, 94, 0.15);
-      animation: bannerSlideIn 0.3s ease-out;
-    }
-
-    @keyframes bannerSlideIn {
-      from { opacity: 0; transform: translateY(-8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .search-match-icon {
-      width: 17px;
-      height: 17px;
-      stroke: #4ade80;
-      flex-shrink: 0;
-      margin-top: 1px;
-    }
-
-    .search-match-text {
-      font-size: 0.78rem;
-      line-height: 1.45;
-      color: #dcfce7;
-    }
-
-    .search-match-title {
-      font-weight: 700;
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: #4ade80;
-      margin-bottom: 2px;
-    }
-
-    /* Empty state */
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 60px 20px;
-      color: var(--text-muted);
-      height: 100%;
-    }
-
-    .empty-icon {
-      width: 52px;
-      height: 52px;
-      border-radius: 14px;
-      background: rgba(30, 41, 59, 0.4);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 14px;
-      border: 1px solid var(--border-color);
-    }
-
-    .empty-icon svg {
-      width: 26px;
-      height: 26px;
-      stroke: var(--text-secondary);
-    }
-
-    /* Loading Spinner */
-    .loading-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 50px 20px;
-      gap: 14px;
-      text-align: center;
-    }
-
-    .spinner {
-      width: 36px;
-      height: 36px;
-      border: 3px solid rgba(99, 102, 241, 0.2);
-      border-radius: 50%;
-      border-top-color: #6366f1;
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    /* Card Panels */
-    .card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: 11px;
-      padding: 15px;
-      position: relative;
-    }
-
-    .file-header-card {
-      background: linear-gradient(180deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.7));
-      border: 1px solid rgba(148, 163, 184, 0.2);
-    }
-
-    .file-path {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.72rem;
-      color: var(--text-secondary);
-      margin-bottom: 4px;
-      word-break: break-all;
-    }
-
-    .file-title-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
-    .file-title {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: #fff;
-    }
-
-    /* Sleek Status Pills */
-    .risk-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 4px 10px;
+    /* Custom Scrollbar for Sleek Dark Glass UI */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(71, 85, 105, 0.5);
       border-radius: 9999px;
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      white-space: nowrap;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(99, 102, 241, 0.6);
     }
 
-    .pill-safe {
-      background: rgba(16, 185, 129, 0.15);
-      color: #34d399;
-      border: 1px solid rgba(16, 185, 129, 0.35);
+    /* Gradient borders & glow utilities */
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.82);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(148, 163, 184, 0.15);
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.55);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+    }
+    .ai-gradient-border {
+      position: relative;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(168, 85, 247, 0.04));
+      border: 1px solid rgba(99, 102, 241, 0.28);
+    }
+    .blast-gradient-border {
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(249, 115, 22, 0.06));
+      border: 1px solid rgba(239, 68, 68, 0.35);
+    }
+    .blast-gradient-safe {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(6, 182, 212, 0.05));
+      border: 1px solid rgba(16, 185, 129, 0.25);
     }
 
-    .pill-moderate {
-      background: rgba(245, 158, 11, 0.15);
-      color: #fbbf24;
-      border: 1px solid rgba(245, 158, 11, 0.35);
-    }
-
-    .pill-critical {
-      background: rgba(239, 68, 68, 0.18);
-      color: #f87171;
-      border: 1px solid rgba(239, 68, 68, 0.4);
-      box-shadow: 0 0 14px rgba(239, 68, 68, 0.25);
-    }
-
-    .risk-meter-container {
-      margin-top: 8px;
-    }
-
-    .risk-meter-header {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.7rem;
-      color: var(--text-secondary);
-      margin-bottom: 4px;
-      font-weight: 500;
-    }
-
-    .meter-track {
-      height: 5px;
-      background: rgba(15, 23, 42, 0.8);
-      border-radius: 999px;
-      overflow: hidden;
-      border: 1px solid var(--border-color);
-      display: flex;
-    }
-
-    .meter-fill {
-      height: 100%;
-      border-radius: 999px;
-      transition: width 0.4s ease;
-    }
-
-    .meter-fill.low { width: 20%; background: #10b981; }
-    .meter-fill.medium { width: 45%; background: #f59e0b; }
-    .meter-fill.high { width: 80%; background: #ef4444; }
-    .meter-fill.critical { width: 100%; background: #dc2626; }
-
-    /* AI Summary Box */
-    .ai-summary-box {
-      background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.04));
-      border: 1px solid rgba(99, 102, 241, 0.25);
-    }
-
-    .section-label {
-      font-size: 0.72rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-secondary);
-      font-weight: 600;
-      margin-bottom: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .summary-text {
-      font-size: 0.84rem;
-      line-height: 1.55;
-      color: #e2e8f0;
-    }
-
-    .provider-tag {
-      font-size: 0.65rem;
-      color: #a5b4fc;
-      margin-top: 8px;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    /* Blast Radius Callout & Glowing CTA Button */
-    .blast-radius-box {
-      background: rgba(239, 68, 68, 0.08);
-      border: 1px solid rgba(239, 68, 68, 0.28);
-      border-left: 4px solid var(--accent-red);
-    }
-
-    .blast-radius-box.low-risk {
-      background: rgba(16, 185, 129, 0.06);
-      border: 1px solid rgba(16, 185, 129, 0.2);
-      border-left: 4px solid var(--accent-emerald);
-    }
-
-    .blast-title {
-      font-size: 0.76rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 6px;
-    }
-
-    .blast-title.red { color: #f87171; }
-    .blast-title.green { color: #34d399; }
-
-    .blast-desc {
-      font-size: 0.8rem;
-      line-height: 1.5;
-      color: #cbd5e1;
-    }
-
-    /* Glowing Primary CTA */
-    .btn-blast {
-      background: linear-gradient(135deg, #ea580c, #f97316);
-      border: 1px solid rgba(254, 215, 170, 0.4);
-      color: #fff;
-      font-weight: 700;
-      width: 100%;
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 0.82rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 7px;
-      box-shadow: 0 4px 18px rgba(234, 88, 12, 0.45);
-      transition: all 0.2s ease;
-      margin-top: 10px;
-    }
-
-    .btn-blast:hover {
-      background: linear-gradient(135deg, #c2410c, #ea580c);
-      transform: translateY(-1px);
-      box-shadow: 0 6px 24px rgba(234, 88, 12, 0.65);
-    }
-
-    /* Dependency Lists */
-    .dep-section {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: 11px;
-      padding: 14px;
-    }
-
-    .dep-list {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-      margin-top: 6px;
-    }
-
-    .dep-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 7px 11px;
-      background: rgba(15, 23, 42, 0.65);
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.78rem;
-      color: #e2e8f0;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .dep-item:hover {
-      background: rgba(59, 130, 246, 0.15);
-      border-color: rgba(59, 130, 246, 0.4);
-      transform: translateX(3px);
-    }
-
-    .dep-arrow {
-      color: var(--text-muted);
-      font-size: 0.72rem;
-    }
-
-    .no-deps {
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      font-style: italic;
-      padding: 4px 0;
+    /* Vis Network Canvas Focus Outline */
+    #graph-canvas {
+      outline: none;
     }
   </style>
 </head>
-<body>
 
-  <!-- Modern Glassmorphic Header -->
-  <header>
-    <!-- Left: Brand Logo & Title -->
-    <div class="brand-section">
-      <div class="logo-icon">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-      </div>
-      <div>
-        <h1 class="brand-title">RepoNavigator</h1>
-        <div class="active-repo-badge" id="active-repo-name" title="Active Project">
-          <span>📁</span>
-          <span id="repo-name-text">test_project</span>
+<body class="bg-canvas text-slate-100 font-sans h-screen w-screen overflow-hidden flex flex-col relative select-none">
+
+  <!-- Full-Viewport Canvas Background -->
+  <div id="graph-canvas" class="absolute inset-0 z-0 bg-[#0b0f19]"></div>
+
+  <!-- FLOATING GLASS TOPBAR -->
+  <header class="relative z-30 mx-4 mt-3 flex-shrink-0">
+    <div class="bg-slate-900/80 backdrop-blur-md border border-slate-700/50 rounded-2xl px-4 py-2.5 shadow-2xl flex items-center justify-between gap-4">
+      
+      <!-- Left: Brand + Pulse + Active Repo -->
+      <div class="flex items-center gap-3 flex-shrink-0">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-blue-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 ring-1 ring-white/20">
+          <i class="fa-solid fa-network-wired text-white text-base"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-base tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">
+              RepoNavigator
+            </span>
+            <span class="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              AI
+            </span>
+            <span class="relative flex h-2 w-2 ml-0.5">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+          </div>
+          <div class="flex items-center gap-1.5 text-xs text-slate-400 font-mono">
+            <i class="fa-regular fa-folder-open text-[11px] text-blue-400"></i>
+            <span id="active-repo-badge" class="truncate max-w-[140px] text-blue-300 font-medium">test_project</span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Center: GitHub Cloner & Architecture Search -->
-    <div class="header-tools">
-      <!-- Ingestion input -->
-      <div class="clone-box">
-        <svg class="github-icon" viewBox="0 0 24 24">
-          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-        </svg>
-        <input 
-          type="text" 
-          id="clone-repo-input" 
-          class="clone-input" 
-          placeholder="Paste GitHub repository URL..." 
-          autocomplete="off"
-        />
-        <button class="btn-clone" id="btn-clone-repo">
-          <span id="clone-btn-text">Analyze</span>
+      <!-- Center: Ingestion + Architecture Query Search -->
+      <div class="flex items-center gap-3 flex-1 max-w-3xl">
+        
+        <!-- Public GitHub URL Ingestion Input -->
+        <div class="relative flex-1 group">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-400 transition-colors">
+            <i class="fa-brands fa-github text-sm"></i>
+          </div>
+          <input 
+            type="text" 
+            id="repo-url" 
+            placeholder="Paste public GitHub repository URL..."
+            class="w-full h-9 pl-9 pr-24 bg-slate-950/70 border border-slate-700/60 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-inner"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button 
+            id="btn-analyze" 
+            class="absolute right-1 top-1 bottom-1 px-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span id="analyze-spinner" class="hidden"><i class="fa-solid fa-circle-notch fa-spin text-[10px]"></i></span>
+            <span id="analyze-btn-text">Analyze</span>
+          </button>
+        </div>
+
+        <!-- "Ask codebase" Natural-Language Search -->
+        <div class="relative flex-1 group">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-400 transition-colors">
+            <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+          </div>
+          <input 
+            type="text" 
+            id="search-query" 
+            placeholder="Ask codebase: e.g. where is db or auth handled?..."
+            class="w-full h-9 pl-9 pr-24 bg-slate-950/70 border border-slate-700/60 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all shadow-inner"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <div class="absolute right-1 top-1 bottom-1 flex items-center gap-1">
+            <kbd class="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-slate-800/80 border border-slate-700 rounded select-none">⌘K</kbd>
+            <button 
+              id="btn-search" 
+              class="px-2.5 h-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-all shadow-md active:scale-95"
+              title="Search Architecture"
+            >
+              <i class="fa-solid fa-magnifying-glass text-[10px]"></i>
+              <span>Find</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Action Buttons (Hide Tests, Fit View, Reset) -->
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <button 
+          id="toggle-tests" 
+          class="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border border-slate-700/60 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+          title="Toggle Test Files (test_*.py)"
+        >
+          <i id="toggle-tests-icon" class="fa-solid fa-eye-slash text-xs text-amber-400"></i>
+          <span id="toggle-tests-label">Hide Tests</span>
+        </button>
+
+        <button 
+          id="btn-fit" 
+          class="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border border-slate-700/60 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+          title="Fit Graph to Screen"
+        >
+          <i class="fa-solid fa-expand text-xs text-blue-400"></i>
+          <span>Fit View</span>
+        </button>
+
+        <button 
+          id="btn-reset" 
+          class="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border border-slate-700/60 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+          title="Reset Graph Colors & View"
+        >
+          <i class="fa-solid fa-rotate-left text-xs text-slate-400"></i>
+          <span>Reset</span>
         </button>
       </div>
 
-      <!-- Architecture Query Search -->
-      <div class="search-box">
-        <svg class="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-        </svg>
-        <input 
-          type="text" 
-          id="architecture-query-input" 
-          class="search-input" 
-          placeholder="Ask codebase architecture: e.g. login or db..." 
-          autocomplete="off"
-        />
-        <div class="search-actions-group">
-          <span class="shortcut-badge" id="shortcut-hint">⌘K</span>
-          <button class="btn-search" id="btn-search-architecture">
-            <span>Find</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Right: Navigation & View Toolbar -->
-    <div class="header-actions">
-      <button class="btn-nav" id="btn-toggle-tests" title="Toggle visibility of test files (test_*.py)">
-        <span id="test-toggle-icon">👁️</span>
-        <span id="test-toggle-label">Hide Tests</span>
-      </button>
-      <button class="btn-nav" id="btn-reset-graph" title="Reset View & Colors">
-        Reset View
-      </button>
-      <button class="btn-nav" id="btn-fit" title="Fit to Screen">
-        Fit Screen
-      </button>
     </div>
   </header>
 
-  <!-- Main Canvas Workspace -->
-  <div class="main-container">
-    <div id="graph-container">
-      <!-- Active Blast Radius Floating Banner -->
-      <div id="blast-status-banner" class="blast-active-banner" style="display: none;">
-        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#f97316">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-        <div class="blast-active-text" id="blast-banner-text">
-          Blast Radius: <strong id="blast-target-name">database.py</strong> &rarr; <span id="blast-affected-count">2</span> downstream modules affected
-        </div>
-        <button class="btn-reset-view" id="btn-clear-blast">Clear Simulation</button>
-      </div>
+  <!-- Workspace Container: Graph Canvas + Floating Overlays -->
+  <main class="relative flex-1 w-full h-full overflow-hidden">
 
-      <!-- Canvas Controls -->
-      <div class="canvas-controls">
-        <button class="control-btn" id="ctrl-zoom-in" title="Zoom In">+</button>
-        <button class="control-btn" id="ctrl-zoom-out" title="Zoom Out">−</button>
-        <button class="control-btn" id="ctrl-physics" title="Toggle Physics">⚡</button>
+    <!-- Active Blast Radius Simulation Floating Banner -->
+    <div id="blast-status-banner" class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-amber-950/80 backdrop-blur-md border border-orange-500/50 rounded-xl px-4 py-2 text-xs text-orange-200 shadow-2xl flex items-center gap-3 animate-bounce-subtle">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-bolt-lightning text-orange-400 text-sm animate-pulse"></i>
+        <span>Blast Simulation: <strong id="blast-target-name" class="font-mono text-white"></strong> &rarr; <strong id="blast-affected-count" class="text-orange-300">0</strong> downstream modules affected</span>
       </div>
+      <button id="btn-clear-blast" class="px-2.5 py-0.5 bg-orange-600/60 hover:bg-orange-600 text-white rounded-lg text-[11px] font-semibold transition-all">
+        Clear
+      </button>
+    </div>
 
-      <!-- Graph Legend -->
-      <div class="canvas-legend">
-        <div class="legend-title">Graph Legend</div>
-        <div class="legend-item">
-          <div class="legend-dot red"></div>
-          <span><strong>Critical Hub</strong> (≥ 2 Inbound Dependencies)</span>
+    <!-- Floating Canvas Controls (Zoom In, Zoom Out, Physics) -->
+    <div class="absolute top-4 left-6 z-20 flex flex-col gap-2">
+      <button id="ctrl-zoom-in" class="w-9 h-9 bg-slate-900/80 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700/50 rounded-xl flex items-center justify-center text-sm shadow-xl backdrop-blur-md transition-all active:scale-90" title="Zoom In">
+        <i class="fa-solid fa-plus"></i>
+      </button>
+      <button id="ctrl-zoom-out" class="w-9 h-9 bg-slate-900/80 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700/50 rounded-xl flex items-center justify-center text-sm shadow-xl backdrop-blur-md transition-all active:scale-90" title="Zoom Out">
+        <i class="fa-solid fa-minus"></i>
+      </button>
+      <button id="ctrl-physics" class="w-9 h-9 bg-slate-900/80 hover:bg-slate-800 text-amber-400 border border-slate-700/50 rounded-xl flex items-center justify-center text-sm shadow-xl backdrop-blur-md transition-all active:scale-90" title="Toggle Physics Simulation">
+        <i class="fa-solid fa-atom"></i>
+      </button>
+    </div>
+
+    <!-- Floating Graph Legend -->
+    <div class="absolute bottom-16 left-6 z-20 glass-panel rounded-xl p-3 shadow-2xl max-w-xs text-[11px]">
+      <div class="font-semibold text-slate-400 uppercase tracking-wider text-[10px] mb-2 flex items-center gap-1.5">
+        <i class="fa-solid fa-circle-info text-indigo-400"></i>
+        <span>Graph Legend</span>
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <div class="flex items-center gap-2 text-slate-300">
+          <span class="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50"></span>
+          <span><strong>High Risk Hub</strong> (&ge; 2 Inbound Dependencies)</span>
         </div>
-        <div class="legend-item">
-          <div class="legend-dot orange"></div>
-          <span><strong>Affected Downstream</strong> (Blast Impact)</span>
+        <div class="flex items-center gap-2 text-slate-300">
+          <span class="w-2.5 h-2.5 rounded-full bg-orange-500 shadow-sm shadow-orange-500/50"></span>
+          <span><strong>Blast Radius Impact</strong> (Downstream Affected)</span>
         </div>
-        <div class="legend-item">
-          <div class="legend-dot blue"></div>
+        <div class="flex items-center gap-2 text-slate-300">
+          <span class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></span>
           <span><strong>Standard Module</strong> (&lt; 2 Inbound)</span>
         </div>
-        <div class="legend-item">
-          <div class="legend-dot dimmed"></div>
-          <span><strong>Unrelated / Dimmed</strong></span>
-        </div>
-      </div>
-
-      <!-- Bottom Architecture Stats HUD -->
-      <div class="hud-stats-badge" id="hud-stats">
-        <div class="hud-stat-item">
-          <span>📁 Modules:</span>
-          <strong id="hud-module-count">3</strong>
-        </div>
-        <div class="hud-divider"></div>
-        <div class="hud-stat-item">
-          <span>🔗 Dependencies:</span>
-          <strong id="hud-dep-count">3</strong>
-        </div>
-        <div class="hud-divider"></div>
-        <div class="hud-stat-item">
-          <span>🚨 Critical Hubs:</span>
-          <strong id="hud-hub-count" style="color: #f87171;">1</strong>
+        <div class="flex items-center gap-2 text-slate-400">
+          <span class="w-2.5 h-2.5 rounded-full bg-slate-600 opacity-40"></span>
+          <span><strong>Dimmed / Unaffected</strong></span>
         </div>
       </div>
     </div>
 
-    <!-- Inspector Sidebar -->
-    <aside id="sidebar">
-      <div class="sidebar-header">
-        <h2>
-          <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#818cf8">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-          </svg>
-          Module Inspector
-        </h2>
+    <!-- BOTTOM-LEFT STATS HUD -->
+    <div id="stats-hud" class="absolute bottom-4 left-6 z-20 flex items-center gap-3 bg-slate-900/80 backdrop-blur-md border border-slate-700/60 rounded-xl px-4 py-2 text-xs text-slate-300 shadow-xl pointer-events-none">
+      <span class="flex items-center gap-1.5">
+        <i class="fa-regular fa-file-code text-blue-400"></i>
+        <span>Modules: <strong id="hud-modules" class="text-white font-mono font-semibold">0</strong></span>
+      </span>
+      <span class="text-slate-600">|</span>
+      <span class="flex items-center gap-1.5">
+        <i class="fa-solid fa-diagram-project text-indigo-400"></i>
+        <span>Connections: <strong id="hud-deps" class="text-white font-mono font-semibold">0</strong></span>
+      </span>
+      <span class="text-slate-600">|</span>
+      <span class="flex items-center gap-1.5">
+        <i class="fa-solid fa-triangle-exclamation text-rose-400"></i>
+        <span>Bottlenecks: <strong id="hud-bottlenecks" class="text-rose-400 font-mono font-semibold">0</strong></span>
+      </span>
+    </div>
+
+    <!-- RIGHT SIDEBAR (MODULE INSPECTOR DRAWER) -->
+    <aside 
+      id="inspector-panel" 
+      class="absolute right-4 top-4 bottom-4 w-96 z-20 glass-panel rounded-2xl p-5 shadow-2xl flex flex-col gap-4 overflow-y-auto"
+    >
+      <!-- Sidebar Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-700/50 flex-shrink-0">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-microchip text-indigo-400 text-sm"></i>
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-200">Module Inspector</h2>
+        </div>
+        <button id="btn-close-inspector" class="text-slate-400 hover:text-white text-xs transition-colors" title="Close Panel">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
       </div>
 
-      <div class="sidebar-content" id="sidebar-content">
-        <div class="empty-state">
-          <div class="empty-icon">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
-            </svg>
-          </div>
-          <p style="font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Select a Module or Ask a Question</p>
-          <p style="font-size: 0.8rem; line-height: 1.4;">Paste any public GitHub repository URL above, or click any bubble to inspect architecture.</p>
+      <!-- Natural Language Query Match Banner (Dynamic) -->
+      <div id="query-match-banner" class="hidden p-3 rounded-xl bg-emerald-950/50 border border-emerald-500/40 text-xs text-emerald-200 flex items-start gap-2.5 shadow-lg">
+        <i class="fa-solid fa-circle-check text-emerald-400 text-sm mt-0.5 flex-shrink-0"></i>
+        <div>
+          <div class="font-bold text-[11px] uppercase tracking-wider text-emerald-300">Architecture Match</div>
+          <div id="query-match-reason" class="text-xs text-emerald-100 mt-0.5 leading-relaxed"></div>
         </div>
       </div>
-    </aside>
-  </div>
 
+      <!-- Empty State View -->
+      <div id="inspector-empty-state" class="flex flex-col items-center justify-center text-center py-16 px-4 text-slate-400 my-auto">
+        <div class="w-14 h-14 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex items-center justify-center text-slate-400 mb-4 shadow-inner">
+          <i class="fa-solid fa-arrow-pointer text-xl text-indigo-400"></i>
+        </div>
+        <p class="font-semibold text-slate-200 text-sm mb-1">Select a Module</p>
+        <p class="text-xs text-slate-400 max-w-xs leading-relaxed">
+          Click any bubble in the graph or enter a natural-language search query above to inspect dependencies and AI analysis.
+        </p>
+      </div>
+
+      <!-- Active Module Details View -->
+      <div id="inspector-active-state" class="hidden flex flex-col gap-4">
+        
+        <!-- File Header Card -->
+        <div class="glass-card rounded-xl p-4 flex flex-col gap-2 relative">
+          <div id="inspector-filepath" class="font-mono text-[11px] text-slate-400 truncate" title="File Path">
+            auth.py
+          </div>
+          <div class="flex items-center justify-between gap-2">
+            <h3 id="inspector-filename" class="font-mono text-base font-bold text-white truncate">
+              auth.py
+            </h3>
+            <span id="inspector-risk" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+              Safe
+            </span>
+          </div>
+
+          <!-- Risk Meter -->
+          <div class="mt-2">
+            <div class="flex justify-between text-[10px] text-slate-400 font-medium mb-1">
+              <span>Blast Risk Level</span>
+              <span id="risk-score-text" class="font-mono text-slate-300">Score 1/5</span>
+            </div>
+            <div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden border border-slate-700/50">
+              <div id="risk-meter-fill" class="h-full bg-emerald-500 transition-all duration-500 rounded-full" style="width: 20%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Code Summary Box -->
+        <div class="ai-gradient-border rounded-xl p-4 flex flex-col gap-2 shadow-lg">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+              <i class="fa-solid fa-brain text-indigo-400"></i>
+              <span>AI Code Summary</span>
+            </span>
+            <span class="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              AI Verified
+            </span>
+          </div>
+          <div id="inspector-summary" class="text-xs text-slate-200 leading-relaxed">
+            Module authentication and session management handlers.
+          </div>
+          <div class="text-[10px] text-indigo-300/70 font-mono flex items-center gap-1 mt-1">
+            <i class="fa-solid fa-sparkles text-[9px]"></i>
+            <span id="ai-provider-tag">Analyzed via Architecture Engine</span>
+          </div>
+        </div>
+
+        <!-- Direct Blast Radius Impact & Glowing CTA -->
+        <div id="blast-impact-card" class="blast-gradient-border rounded-xl p-4 flex flex-col gap-2.5 shadow-lg">
+          <div class="flex items-center gap-2 text-rose-300 text-xs font-bold uppercase tracking-wider">
+            <i class="fa-solid fa-triangle-exclamation text-rose-400"></i>
+            <span>Blast Radius Impact</span>
+          </div>
+          <p id="inspector-blast-warning" class="text-xs text-slate-300 leading-relaxed">
+            Modifying this module may impact downstream dependents.
+          </p>
+          <button 
+            id="btn-blast-radius" 
+            class="w-full py-2.5 px-4 bg-gradient-to-r from-orange-600 via-orange-500 to-rose-600 hover:from-orange-500 hover:to-rose-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 active:scale-95 transition-all mt-1"
+          >
+            <i class="fa-solid fa-bolt-lightning text-xs"></i>
+            <span>⚡ Simulate Blast Radius</span>
+          </button>
+        </div>
+
+        <!-- Inbound Dependencies (Imported By) -->
+        <div class="glass-card rounded-xl p-3 flex flex-col gap-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-400 font-medium flex items-center gap-1.5">
+              <i class="fa-solid fa-arrow-down-left text-cyan-400 text-[10px]"></i>
+              <span>Imported By</span>
+            </span>
+            <span id="inbound-count-badge" class="font-mono text-[10px] text-cyan-300 bg-cyan-950/60 border border-cyan-700/40 px-1.5 py-0.5 rounded">0</span>
+          </div>
+          <div id="inspector-inbound-chips" class="flex flex-wrap gap-1.5 mt-1">
+            <span class="text-xs text-slate-500 italic">No incoming dependents</span>
+          </div>
+        </div>
+
+        <!-- Outbound Dependencies (Imports) -->
+        <div class="glass-card rounded-xl p-3 flex flex-col gap-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-400 font-medium flex items-center gap-1.5">
+              <i class="fa-solid fa-arrow-up-right text-purple-400 text-[10px]"></i>
+              <span>Imports Modules</span>
+            </span>
+            <span id="outbound-count-badge" class="font-mono text-[10px] text-purple-300 bg-purple-950/60 border border-purple-700/40 px-1.5 py-0.5 rounded">0</span>
+          </div>
+          <div id="inspector-outbound-chips" class="flex flex-wrap gap-1.5 mt-1">
+            <span class="text-xs text-slate-500 italic">No outbound dependencies</span>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- JAVASCRIPT APPLICATION LOGIC -->
   <script>
     let network = null;
     let nodesDataSet = null;
@@ -1084,18 +438,31 @@
     let currentlySelectedNodeId = null;
     let isBlastModeActive = false;
 
-    // Detect OS for shortcut hint
-    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-    const shortcutHint = document.getElementById('shortcut-hint');
-    if (shortcutHint) {
-      shortcutHint.textContent = isMac ? '⌘K' : 'Ctrl+K';
+    // Toast Notification System
+    function showToast(message, isError = false) {
+      const existing = document.getElementById('global-toast');
+      if (existing) existing.remove();
+
+      const toast = document.createElement('div');
+      toast.id = 'global-toast';
+      toast.className = `fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl text-xs font-medium backdrop-blur-md shadow-2xl flex items-center gap-2 border transition-all ${
+        isError 
+          ? 'bg-rose-950/90 border-rose-500/60 text-rose-200' 
+          : 'bg-slate-900/90 border-blue-500/60 text-slate-100'
+      }`;
+      toast.innerHTML = `
+        <i class="fa-solid ${isError ? 'fa-triangle-exclamation text-rose-400' : 'fa-sparkles text-blue-400'}"></i>
+        <span>${message}</span>
+      `;
+      document.body.appendChild(toast);
+      setTimeout(() => { toast.remove(); }, 3800);
     }
 
-    // Keyboard shortcut (Cmd+K / Ctrl+K)
+    // Keyboard Shortcut (Cmd+K / Ctrl+K)
     window.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        const searchInput = document.getElementById('architecture-query-input');
+        const searchInput = document.getElementById('search-query');
         if (searchInput) {
           searchInput.focus();
           searchInput.select();
@@ -1103,55 +470,54 @@
       }
     });
 
-    function showToast(message, isError = false) {
-      const existing = document.querySelector('.toast-notification');
-      if (existing) existing.remove();
+    // Update Bottom-Left Architecture Stats HUD
+    function updateStatsHUD(nodes, edges) {
+      const totalModules = nodes ? nodes.length : 0;
+      const totalDeps = edges ? edges.length : 0;
+      const bottlenecks = nodes ? nodes.filter(n => (n.incoming_count || 0) >= 2).length : 0;
 
-      const toast = document.createElement('div');
-      toast.className = 'toast-notification';
-      toast.style.borderColor = isError ? 'rgba(239, 68, 68, 0.6)' : 'rgba(59, 130, 246, 0.6)';
-      toast.innerHTML = `
-        <span>${isError ? '⚠️' : '✨'}</span>
-        <span>${message}</span>
-      `;
-      document.body.appendChild(toast);
-      setTimeout(() => { toast.remove(); }, 4000);
+      const modEl = document.getElementById('hud-modules');
+      if (modEl) modEl.textContent = totalModules;
+
+      const depEl = document.getElementById('hud-deps');
+      if (depEl) depEl.textContent = totalDeps;
+
+      const botEl = document.getElementById('hud-bottlenecks');
+      if (botEl) botEl.textContent = bottlenecks;
     }
 
+    // Fetch initial Graph Data from Backend
     async function fetchGraphData() {
       try {
         const response = await fetch('/api/graph');
-        if (!response.ok) throw new Error("HTTP error " + response.status);
+        if (!response.ok) throw new Error("API returned status " + response.status);
         const data = await response.json();
         if (data.repo_name) {
-          document.getElementById('repo-name-text').textContent = data.repo_name;
+          const badge = document.getElementById('active-repo-badge');
+          if (badge) badge.textContent = data.repo_name;
         }
         return data;
       } catch (err) {
-        console.warn("Falling back to graph_data.json:", err);
-        const fbResp = await fetch('graph_data.json?t=' + Date.now());
-        return await fbResp.json();
+        console.warn("Falling back to local graph_data.json:", err);
+        const fallback = await fetch('graph_data.json?t=' + Date.now());
+        return await fallback.json();
       }
     }
 
+    // Clone and Scan GitHub Repository
     async function cloneAndScanRepo(repoUrl) {
-      const btn = document.getElementById('btn-clone-repo');
-      const btnText = document.getElementById('clone-btn-text');
-      const input = document.getElementById('clone-repo-input');
+      if (!repoUrl) return;
+
+      const btn = document.getElementById('btn-analyze');
+      const spinner = document.getElementById('analyze-spinner');
+      const btnText = document.getElementById('analyze-btn-text');
+      const input = document.getElementById('repo-url');
 
       btn.disabled = true;
-      btnText.innerHTML = '<span class="spinner" style="width:12px;height:12px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:4px;"></span> Cloning';
+      spinner.classList.remove('hidden');
+      btnText.textContent = 'Cloning...';
 
-      const sidebarContent = document.getElementById('sidebar-content');
-      sidebarContent.innerHTML = `
-        <div class="loading-state">
-          <div class="spinner"></div>
-          <div>
-            <p style="font-weight: 600; color: #fff; font-size: 0.95rem;">Cloning Repository...</p>
-            <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px;">Downloading and parsing dependency graph</p>
-          </div>
-        </div>
-      `;
+      showToast(`Cloning & scanning ${repoUrl}...`);
 
       try {
         const response = await fetch('/api/clone-and-scan', {
@@ -1161,47 +527,32 @@
         });
 
         const result = await response.json();
-
         if (!response.ok || result.error) {
           throw new Error(result.error || "Failed to clone repository.");
         }
 
-        document.getElementById('repo-name-text').textContent = result.repo_name;
+        const badge = document.getElementById('active-repo-badge');
+        if (badge) badge.textContent = result.repo_name;
         input.value = '';
 
         initNetwork(result);
-        resetSidebar();
-
-        showToast(`Successfully analyzed ${result.repo_name} (${result.total_files} modules, ${result.total_connections} dependencies)`);
+        resetInspector();
+        showToast(`Repository ${result.repo_name} analyzed successfully! (${result.total_files} files, ${result.total_connections} deps)`);
 
         if (network) {
-          network.fit({ animation: { duration: 700 } });
+          network.fit({ animation: { duration: 600 } });
         }
       } catch (err) {
         console.error("Clone error:", err);
         showToast(err.message, true);
-        resetSidebar();
       } finally {
         btn.disabled = false;
+        spinner.classList.add('hidden');
         btnText.textContent = 'Analyze';
       }
     }
 
-    async function fetchAiExplanation(filename) {
-      try {
-        const response = await fetch('/api/explain', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: filename })
-        });
-        if (!response.ok) throw new Error("API status " + response.status);
-        return await response.json();
-      } catch (err) {
-        console.error("AI explain fetch failed:", err);
-        return null;
-      }
-    }
-
+    // Query Natural-Language Codebase Architecture
     async function queryArchitectureApi(query) {
       try {
         const response = await fetch('/api/query', {
@@ -1212,11 +563,28 @@
         if (!response.ok) throw new Error("Query API error " + response.status);
         return await response.json();
       } catch (err) {
-        console.error("Query failed:", err);
+        console.error("Architecture Query Failed:", err);
         return null;
       }
     }
 
+    // Fetch AI Explanation for a module
+    async function fetchAiExplanation(filename) {
+      try {
+        const response = await fetch('/api/explain', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: filename })
+        });
+        if (!response.ok) throw new Error("API explain error " + response.status);
+        return await response.json();
+      } catch (err) {
+        console.error("AI Explanation Fetch Failed:", err);
+        return null;
+      }
+    }
+
+    // Fetch Blast Radius Chain from Backend
     async function fetchBlastRadiusApi(filename) {
       try {
         const response = await fetch('/api/blast-radius', {
@@ -1224,29 +592,19 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ filename: filename })
         });
-        if (!response.ok) throw new Error("Blast radius API error " + response.status);
+        if (!response.ok) throw new Error("Blast Radius API error " + response.status);
         return await response.json();
       } catch (err) {
-        console.error("Blast radius fetch failed:", err);
+        console.error("Blast Radius Fetch Failed:", err);
         return null;
       }
     }
 
-    function updateStatsHUD(nodes, edges) {
-      const totalModules = nodes.length;
-      const totalDeps = edges.length;
-      const criticalHubs = nodes.filter(n => (n.incoming_count || 0) >= 2).length;
-
-      document.getElementById('hud-module-count').textContent = totalModules;
-      document.getElementById('hud-dep-count').textContent = totalDeps;
-      document.getElementById('hud-hub-count').textContent = criticalHubs;
-    }
-
+    // Initialize or re-render the vis-network graph
     function initNetwork(data) {
       rawGraphData = data;
-      const container = document.getElementById('graph-container');
+      const container = document.getElementById('graph-canvas');
 
-      // Filter test files if toggle is active
       const visibleNodesList = hideTestsEnabled
         ? data.nodes.filter(n => !n.is_test)
         : data.nodes;
@@ -1256,40 +614,40 @@
 
       updateStatsHUD(visibleNodesList, visibleEdgesList);
 
+      // Format nodes: base size 18 + (in_degree * 4), capped at 45
       const formattedNodes = visibleNodesList.map(node => {
-        const inCount = node.incoming_count || 0;
-        const isCritical = inCount >= 2;
-        // Dynamic Node Sizing: Central bottlenecks appear larger and prominent
-        const dynamicSize = isCritical ? (34 + Math.min((inCount - 2) * 5, 22)) : (inCount === 1 ? 27 : 22);
+        const inDegree = node.incoming_count || 0;
+        const isBottleneck = inDegree >= 2;
+        const dynamicRadius = Math.min(45, 18 + (inDegree * 4));
 
         return {
           id: node.id,
           label: node.label || node.id,
           shape: 'dot',
-          size: dynamicSize,
+          size: dynamicRadius,
           color: {
-            background: isCritical ? '#ef4444' : '#3b82f6',
-            border: isCritical ? '#fca5a5' : '#93c5fd',
+            background: isBottleneck ? '#ef4444' : '#3b82f6',
+            border: isBottleneck ? '#fca5a5' : '#93c5fd',
             highlight: {
-              background: isCritical ? '#dc2626' : '#2563eb',
+              background: isBottleneck ? '#dc2626' : '#2563eb',
               border: '#ffffff'
             },
             hover: {
-              background: isCritical ? '#f87171' : '#60a5fa',
+              background: isBottleneck ? '#f87171' : '#60a5fa',
               border: '#ffffff'
             }
           },
-          borderWidth: isCritical ? 2.5 : 2,
+          borderWidth: isBottleneck ? 2.5 : 2,
           shadow: {
             enabled: true,
-            color: isCritical ? 'rgba(239, 68, 68, 0.55)' : 'rgba(59, 130, 246, 0.45)',
-            size: isCritical ? 18 : 12,
+            color: isBottleneck ? 'rgba(239, 68, 68, 0.55)' : 'rgba(59, 130, 246, 0.45)',
+            size: isBottleneck ? 16 : 10,
             x: 0,
             y: 0
           },
           font: {
             color: '#f8fafc',
-            size: isCritical ? 14 : 13,
+            size: isBottleneck ? 13 : 12,
             face: 'Inter, system-ui, sans-serif',
             strokeWidth: 3,
             strokeColor: '#090d16'
@@ -1297,6 +655,7 @@
         };
       });
 
+      // Format edges: smooth continuous, rgba(148, 163, 184, 0.25), scaleFactor 0.6
       const formattedEdges = visibleEdgesList.map(edge => ({
         id: `${edge.from}->${edge.to}`,
         from: edge.from,
@@ -1304,42 +663,44 @@
         arrows: {
           to: {
             enabled: true,
-            scaleFactor: 0.85,
+            scaleFactor: 0.6,
             type: 'arrow'
           }
         },
         color: {
-          color: 'rgba(148, 163, 184, 0.45)',
+          color: 'rgba(148, 163, 184, 0.25)',
           highlight: '#818cf8',
           hover: '#a5b4fc',
-          opacity: 0.8
+          opacity: 0.75
         },
-        width: 2.2,
+        width: 1.8,
         smooth: {
-          type: 'curvedCW',
-          roundness: 0.15
+          type: 'continuous'
         }
       }));
 
       nodesDataSet = new vis.DataSet(formattedNodes);
       edgesDataSet = new vis.DataSet(formattedEdges);
 
-      // Physics & Clustering Tuning: nodes breathe naturally without tight clumping
       const options = {
-        nodes: { scaling: { min: 18, max: 56 } },
-        edges: { selectionWidth: 3 },
+        nodes: {
+          scaling: { min: 18, max: 45 }
+        },
+        edges: {
+          selectionWidth: 2.5
+        },
         physics: {
           enabled: physicsEnabled,
           solver: 'forceAtlas2Based',
           forceAtlas2Based: {
-            gravitationalConstant: -110,
+            gravitationalConstant: -60,
             centralGravity: 0.012,
-            springLength: 200,
+            springLength: 120,
             springConstant: 0.06,
-            damping: 0.5,
+            damping: 0.4,
             avoidOverlap: 1.0
           },
-          stabilization: { iterations: 180 }
+          stabilization: { iterations: 160 }
         },
         interaction: {
           dragNodes: true,
@@ -1357,14 +718,13 @@
 
       network.on('click', function(params) {
         if (params.nodes.length > 0) {
-          const selectedNodeId = params.nodes[0];
-          currentlySelectedNodeId = selectedNodeId;
+          const selectedId = params.nodes[0];
           clearPulse();
-          inspectNodeWithAi(selectedNodeId);
+          inspectNode(selectedId);
         } else {
           clearPulse();
           if (!isBlastModeActive) {
-            resetSidebar();
+            resetInspector();
           }
         }
       });
@@ -1373,6 +733,243 @@
       network.on('blurNode', () => { container.style.cursor = 'default'; });
     }
 
+    // Inspect a single module and populate the Right Drawer
+    async function inspectNode(nodeId, matchReason = null) {
+      currentlySelectedNodeId = nodeId;
+
+      const emptyState = document.getElementById('inspector-empty-state');
+      const activeState = document.getElementById('inspector-active-state');
+      const matchBanner = document.getElementById('query-match-banner');
+      const matchReasonEl = document.getElementById('query-match-reason');
+
+      const filenameEl = document.getElementById('inspector-filename');
+      const filepathEl = document.getElementById('inspector-filepath');
+      const riskBadgeEl = document.getElementById('inspector-risk');
+      const riskScoreText = document.getElementById('risk-score-text');
+      const riskMeterFill = document.getElementById('risk-meter-fill');
+      const summaryEl = document.getElementById('inspector-summary');
+      const blastWarningEl = document.getElementById('inspector-blast-warning');
+      const aiProviderTag = document.getElementById('ai-provider-tag');
+      const blastImpactCard = document.getElementById('blast-impact-card');
+      const inboundChips = document.getElementById('inspector-inbound-chips');
+      const outboundChips = document.getElementById('inspector-outbound-chips');
+      const inboundCount = document.getElementById('inbound-count-badge');
+      const outboundCount = document.getElementById('outbound-count-badge');
+
+      emptyState.classList.add('hidden');
+      activeState.classList.remove('hidden');
+
+      // Natural language query reason banner
+      if (matchReason) {
+        matchBanner.classList.remove('hidden');
+        matchReasonEl.textContent = matchReason;
+      } else {
+        matchBanner.classList.add('hidden');
+      }
+
+      // Initial loading state placeholder
+      filenameEl.textContent = nodeId;
+      filepathEl.textContent = nodeId;
+      summaryEl.innerHTML = '<span class="text-slate-400 italic"><i class="fa-solid fa-spinner fa-spin mr-1.5 text-indigo-400"></i>Analyzing module architecture...</span>';
+
+      const localNode = rawGraphData ? rawGraphData.nodes.find(n => n.id === nodeId) : null;
+      const aiResult = await fetchAiExplanation(nodeId);
+
+      const filePath = aiResult?.file_path || nodeId;
+      const summary = aiResult?.summary || (localNode ? `Module ${nodeId} in project.` : 'No summary available.');
+      const inCount = aiResult?.incoming_dependencies?.length ?? localNode?.incoming_count ?? 0;
+      const riskScore = aiResult?.risk_score ?? (inCount >= 2 ? 4 : (inCount === 1 ? 2 : 1));
+      const riskLevel = aiResult?.risk_level || (riskScore >= 4 ? 'Critical Bottleneck' : (riskScore >= 2 ? 'Moderate' : 'Safe'));
+      const blastRadius = aiResult?.blast_radius_warning || 'Downstream impact analysis pending.';
+      const provider = aiResult?.provider || 'Architecture Engine';
+      const incoming = aiResult?.incoming_dependencies || localNode?.incoming_dependencies || [];
+      const outgoing = aiResult?.outgoing_dependencies || localNode?.outgoing_dependencies || [];
+
+      filepathEl.textContent = filePath;
+      filenameEl.textContent = localNode?.label || nodeId;
+      summaryEl.textContent = summary;
+      blastWarningEl.textContent = blastRadius;
+      aiProviderTag.textContent = `Analyzed via ${provider}`;
+
+      // Risk level styling
+      if (riskScore >= 4 || inCount >= 2) {
+        riskBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap bg-rose-500/20 text-rose-300 border border-rose-500/40';
+        riskBadgeEl.textContent = 'Bottleneck Hub';
+        riskScoreText.textContent = `Score ${riskScore}/5 (High)`;
+        riskMeterFill.className = 'h-full bg-rose-500 transition-all duration-500 rounded-full';
+        riskMeterFill.style.width = '90%';
+        blastImpactCard.className = 'blast-gradient-border rounded-xl p-4 flex flex-col gap-2.5 shadow-lg';
+      } else if (riskScore >= 2 || inCount === 1) {
+        riskBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap bg-amber-500/20 text-amber-300 border border-amber-500/40';
+        riskBadgeEl.textContent = 'Moderate';
+        riskScoreText.textContent = `Score ${riskScore}/5 (Moderate)`;
+        riskMeterFill.className = 'h-full bg-amber-500 transition-all duration-500 rounded-full';
+        riskMeterFill.style.width = '50%';
+        blastImpactCard.className = 'blast-gradient-border rounded-xl p-4 flex flex-col gap-2.5 shadow-lg';
+      } else {
+        riskBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        riskBadgeEl.textContent = 'Safe';
+        riskScoreText.textContent = `Score ${riskScore}/5 (Low)`;
+        riskMeterFill.className = 'h-full bg-emerald-500 transition-all duration-500 rounded-full';
+        riskMeterFill.style.width = '25%';
+        blastImpactCard.className = 'blast-gradient-safe rounded-xl p-4 flex flex-col gap-2.5 shadow-lg';
+      }
+
+      // Populate Inbound Dependencies Chips
+      inboundCount.textContent = incoming.length;
+      if (incoming.length > 0) {
+        inboundChips.innerHTML = incoming.map(dep => `
+          <button 
+            onclick="focusAndInspectNode('${dep}')"
+            class="px-2 py-1 bg-cyan-950/50 hover:bg-cyan-900/60 border border-cyan-500/30 hover:border-cyan-400 text-cyan-200 text-[11px] font-mono rounded-lg transition-all flex items-center gap-1 active:scale-95"
+          >
+            <span>${dep}</span>
+            <i class="fa-solid fa-arrow-right text-[9px] text-cyan-400"></i>
+          </button>
+        `).join('');
+      } else {
+        inboundChips.innerHTML = '<span class="text-xs text-slate-500 italic">Root module (No incoming dependencies)</span>';
+      }
+
+      // Populate Outbound Dependencies Chips
+      outboundCount.textContent = outgoing.length;
+      if (outgoing.length > 0) {
+        outboundChips.innerHTML = outgoing.map(dep => `
+          <button 
+            onclick="focusAndInspectNode('${dep}')"
+            class="px-2 py-1 bg-purple-950/50 hover:bg-purple-900/60 border border-purple-500/30 hover:border-purple-400 text-purple-200 text-[11px] font-mono rounded-lg transition-all flex items-center gap-1 active:scale-95"
+          >
+            <span>${dep}</span>
+            <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-purple-400"></i>
+          </button>
+        `).join('');
+      } else {
+        outboundChips.innerHTML = '<span class="text-xs text-slate-500 italic">Leaf module (No external dependencies)</span>';
+      }
+
+      // Connect Blast Radius button
+      const btnBlast = document.getElementById('btn-blast-radius');
+      btnBlast.onclick = () => simulateBlastRadius(nodeId);
+    }
+
+    // Reset Inspector Drawer to Empty State
+    function resetInspector() {
+      currentlySelectedNodeId = null;
+      const emptyState = document.getElementById('inspector-empty-state');
+      const activeState = document.getElementById('inspector-active-state');
+      const matchBanner = document.getElementById('query-match-banner');
+
+      emptyState.classList.remove('hidden');
+      activeState.classList.add('hidden');
+      matchBanner.classList.add('hidden');
+    }
+
+    // Focus on a specific node and inspect
+    function focusAndInspectNode(nodeId) {
+      if (!network) return;
+      clearPulse();
+      network.selectNodes([nodeId]);
+      network.focus(nodeId, {
+        scale: 1.3,
+        animation: { duration: 500, easingFunction: 'easeInOutQuad' }
+      });
+      inspectNode(nodeId);
+    }
+
+    // Pulse highlight animation on focused bubble
+    function highlightAndPulseNode(nodeId) {
+      if (!nodesDataSet || !nodesDataSet.get(nodeId)) return;
+      clearPulse();
+      activePulseNodeId = nodeId;
+
+      const baseNode = rawGraphData ? rawGraphData.nodes.find(n => n.id === nodeId) : null;
+      const inDegree = baseNode?.incoming_count || 0;
+      const isBottleneck = inDegree >= 2;
+      const baseRadius = Math.min(45, 18 + (inDegree * 4));
+
+      let step = 0;
+      pulseInterval = setInterval(() => {
+        step++;
+        const isPulsePeak = step % 2 === 1;
+        nodesDataSet.update({
+          id: nodeId,
+          size: isPulsePeak ? baseRadius + 10 : baseRadius + 4,
+          borderWidth: isPulsePeak ? 5 : 3,
+          color: {
+            background: isBottleneck ? '#ef4444' : '#3b82f6',
+            border: '#22c55e',
+            highlight: {
+              background: isBottleneck ? '#dc2626' : '#2563eb',
+              border: '#22c55e'
+            }
+          },
+          shadow: {
+            enabled: true,
+            color: 'rgba(34, 197, 94, 0.95)',
+            size: isPulsePeak ? 28 : 16,
+            x: 0,
+            y: 0
+          }
+        });
+
+        if (step >= 8) {
+          clearInterval(pulseInterval);
+          pulseInterval = null;
+          nodesDataSet.update({
+            id: nodeId,
+            size: baseRadius + 5,
+            borderWidth: 3.5,
+            color: {
+              background: isBottleneck ? '#ef4444' : '#3b82f6',
+              border: '#22c55e'
+            },
+            shadow: {
+              enabled: true,
+              color: 'rgba(34, 197, 94, 0.75)',
+              size: 20,
+              x: 0,
+              y: 0
+            }
+          });
+        }
+      }, 350);
+    }
+
+    // Clear active pulse animation
+    function clearPulse() {
+      if (pulseInterval) {
+        clearInterval(pulseInterval);
+        pulseInterval = null;
+      }
+      if (activePulseNodeId && nodesDataSet) {
+        const baseNode = rawGraphData?.nodes?.find(n => n.id === activePulseNodeId);
+        if (baseNode) {
+          const inDegree = baseNode.incoming_count || 0;
+          const isBottleneck = inDegree >= 2;
+          const baseRadius = Math.min(45, 18 + (inDegree * 4));
+
+          nodesDataSet.update({
+            id: activePulseNodeId,
+            size: baseRadius,
+            borderWidth: isBottleneck ? 2.5 : 2,
+            color: {
+              background: isBottleneck ? '#ef4444' : '#3b82f6',
+              border: isBottleneck ? '#fca5a5' : '#93c5fd'
+            },
+            shadow: {
+              enabled: true,
+              color: isBottleneck ? 'rgba(239, 68, 68, 0.55)' : 'rgba(59, 130, 246, 0.45)',
+              size: isBottleneck ? 16 : 10,
+              x: 0,
+              y: 0
+            }
+          });
+        }
+        activePulseNodeId = null;
+      }
+    }
+
+    // Simulate Blast Radius with Graph Dimming
     async function simulateBlastRadius(targetNodeId) {
       if (!rawGraphData) return;
       isBlastModeActive = true;
@@ -1390,13 +987,14 @@
       if (banner && targetNameEl && affectedCountEl) {
         targetNameEl.textContent = targetNodeId;
         affectedCountEl.textContent = affectedNodes.length;
-        banner.style.display = 'flex';
+        banner.classList.remove('hidden');
       }
 
+      // Dim unaffected nodes, highlight danger path
       const nodeUpdates = [];
       nodesDataSet.forEach(node => {
         const id = node.id;
-        const baseSize = node.size || 24;
+        const baseSize = node.size || 22;
 
         if (id === targetNodeId) {
           nodeUpdates.push({
@@ -1417,7 +1015,7 @@
             },
             font: {
               color: '#ffffff',
-              size: 15,
+              size: 14,
               strokeWidth: 4,
               strokeColor: '#000000'
             }
@@ -1441,7 +1039,7 @@
             },
             font: {
               color: '#fff7ed',
-              size: 14,
+              size: 13,
               strokeWidth: 3,
               strokeColor: '#000000'
             }
@@ -1449,17 +1047,17 @@
         } else {
           nodeUpdates.push({
             id: id,
-            size: 18,
+            size: 14,
             borderWidth: 1,
             color: {
-              background: 'rgba(30, 41, 59, 0.35)',
-              border: 'rgba(71, 85, 105, 0.35)',
-              highlight: { background: 'rgba(51, 65, 85, 0.6)', border: '#64748b' }
+              background: 'rgba(30, 41, 59, 0.25)',
+              border: 'rgba(71, 85, 105, 0.25)',
+              highlight: { background: 'rgba(51, 65, 85, 0.5)', border: '#64748b' }
             },
             shadow: { enabled: false },
             font: {
-              color: '#64748b',
-              size: 11,
+              color: '#475569',
+              size: 10,
               strokeWidth: 0
             }
           });
@@ -1467,6 +1065,7 @@
       });
       nodesDataSet.update(nodeUpdates);
 
+      // Edge updates: highlight affected flows, dim rest
       const edgeUpdates = [];
       edgesDataSet.forEach(edge => {
         const isTargetToAffected = (edge.to === targetNodeId) || 
@@ -1475,24 +1074,24 @@
         if (isTargetToAffected) {
           edgeUpdates.push({
             id: edge.id,
-            width: 3.5,
+            width: 3.2,
             color: {
               color: '#f97316',
               highlight: '#ea580c',
               hover: '#fb923c',
               opacity: 1.0
             },
-            arrows: { to: { enabled: true, scaleFactor: 1.2 } }
+            arrows: { to: { enabled: true, scaleFactor: 1.0 } }
           });
         } else {
           edgeUpdates.push({
             id: edge.id,
-            width: 1.2,
+            width: 1.0,
             color: {
-              color: 'rgba(71, 85, 105, 0.15)',
-              opacity: 0.15
+              color: 'rgba(71, 85, 105, 0.1)',
+              opacity: 0.1
             },
-            arrows: { to: { enabled: true, scaleFactor: 0.5 } }
+            arrows: { to: { enabled: true, scaleFactor: 0.4 } }
           });
         }
       });
@@ -1507,405 +1106,172 @@
       }
     }
 
+    // Reset Graph View & Colors
     function resetGraphView() {
       isBlastModeActive = false;
       clearPulse();
 
       const banner = document.getElementById('blast-status-banner');
-      if (banner) banner.style.display = 'none';
+      if (banner) banner.classList.add('hidden');
 
-      if (!rawGraphData) return;
-      initNetwork(rawGraphData);
+      if (rawGraphData) {
+        initNetwork(rawGraphData);
+      }
 
       if (network) {
         network.fit({ animation: { duration: 500 } });
       }
     }
 
-    function highlightAndPulseNode(nodeId) {
-      if (!nodesDataSet || !nodesDataSet.get(nodeId)) return;
-      clearPulse();
-      activePulseNodeId = nodeId;
-
-      const baseNode = rawGraphData.nodes.find(n => n.id === nodeId);
-      const isCritical = baseNode && ((baseNode.incoming_count || 0) >= 2);
-      const baseSize = baseNode?.size || (isCritical ? 34 : 24);
-
-      let step = 0;
-      pulseInterval = setInterval(() => {
-        step++;
-        const isPulsePeak = step % 2 === 1;
-        nodesDataSet.update({
-          id: nodeId,
-          size: isPulsePeak ? baseSize + 10 : baseSize + 4,
-          borderWidth: isPulsePeak ? 6 : 4,
-          color: {
-            background: isCritical ? '#ef4444' : '#3b82f6',
-            border: '#22c55e',
-            highlight: {
-              background: isCritical ? '#dc2626' : '#2563eb',
-              border: '#22c55e'
-            }
-          },
-          shadow: {
-            enabled: true,
-            color: 'rgba(34, 197, 94, 0.95)',
-            size: isPulsePeak ? 30 : 16,
-            x: 0,
-            y: 0
-          }
-        });
-
-        if (step >= 8) {
-          clearInterval(pulseInterval);
-          pulseInterval = null;
-          nodesDataSet.update({
-            id: nodeId,
-            size: baseSize + 6,
-            borderWidth: 4,
-            color: {
-              background: isCritical ? '#ef4444' : '#3b82f6',
-              border: '#22c55e'
-            },
-            shadow: {
-              enabled: true,
-              color: 'rgba(34, 197, 94, 0.7)',
-              size: 20,
-              x: 0,
-              y: 0
-            }
-          });
-        }
-      }, 400);
-    }
-
-    function clearPulse() {
-      if (pulseInterval) {
-        clearInterval(pulseInterval);
-        pulseInterval = null;
-      }
-      if (activePulseNodeId && nodesDataSet) {
-        const baseNode = rawGraphData?.nodes?.find(n => n.id === activePulseNodeId);
-        if (baseNode) {
-          const inCount = baseNode.incoming_count || 0;
-          const isCritical = inCount >= 2;
-          const dynamicSize = isCritical ? (34 + Math.min((inCount - 2) * 5, 22)) : (inCount === 1 ? 27 : 22);
-
-          nodesDataSet.update({
-            id: activePulseNodeId,
-            size: dynamicSize,
-            borderWidth: isCritical ? 2.5 : 2,
-            color: {
-              background: isCritical ? '#ef4444' : '#3b82f6',
-              border: isCritical ? '#fca5a5' : '#93c5fd'
-            },
-            shadow: {
-              enabled: true,
-              color: isCritical ? 'rgba(239, 68, 68, 0.55)' : 'rgba(59, 130, 246, 0.45)',
-              size: isCritical ? 18 : 12,
-              x: 0,
-              y: 0
-            }
-          });
-        }
-        activePulseNodeId = null;
-      }
-    }
-
+    // Handle Natural-Language Architecture Search
     async function handleArchitectureSearch() {
-      const input = document.getElementById('architecture-query-input');
+      const input = document.getElementById('search-query');
       const query = input.value.trim();
       if (!query) return;
 
-      const sidebarContent = document.getElementById('sidebar-content');
-      sidebarContent.innerHTML = `
-        <div class="loading-state">
-          <div class="spinner"></div>
-          <div>
-            <p style="font-weight: 600; color: #fff; font-size: 0.95rem;">Searching Architecture...</p>
-            <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px;">Matching "${query}" across project modules</p>
-          </div>
-        </div>
-      `;
-
+      showToast(`Searching architecture for "${query}"...`);
       const result = await queryArchitectureApi(query);
+
       if (!result || !result.target_node) {
-        sidebarContent.innerHTML = `
-          <div class="empty-state">
-            <p style="color: #f87171; font-weight: 600;">No match found</p>
-            <p style="font-size: 0.8rem; margin-top: 6px;">Try a different keyword or question.</p>
-          </div>
-        `;
+        showToast(`No matching module found for "${query}"`, true);
         return;
       }
 
-      const targetNodeId = result.target_node;
-      currentlySelectedNodeId = targetNodeId;
+      const targetId = result.target_node;
+      currentlySelectedNodeId = targetId;
 
       if (network) {
-        network.selectNodes([targetNodeId]);
-        network.focus(targetNodeId, {
+        network.selectNodes([targetId]);
+        network.focus(targetId, {
           scale: 1.4,
           animation: { duration: 750, easingFunction: 'easeInOutQuad' }
         });
       }
 
-      highlightAndPulseNode(targetNodeId);
-      await inspectNodeWithAi(targetNodeId, result.reason);
+      highlightAndPulseNode(targetId);
+      await inspectNode(targetId, result.reason);
     }
 
-    async function inspectNodeWithAi(nodeId, matchReason = null) {
-      currentlySelectedNodeId = nodeId;
-      const sidebarContent = document.getElementById('sidebar-content');
-      const localNode = rawGraphData ? rawGraphData.nodes.find(n => n.id === nodeId) : null;
-
-      sidebarContent.innerHTML = `
-        <div class="loading-state">
-          <div class="spinner"></div>
-          <div>
-            <p style="font-weight: 600; color: #fff; font-size: 0.95rem;">Analyzing ${nodeId}...</p>
-            <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px;">Connecting to AI Explainer engine</p>
-          </div>
-        </div>
-      `;
-
-      const aiResult = await fetchAiExplanation(nodeId);
-
-      const filePath = aiResult?.file_path || nodeId;
-      const summary = aiResult?.summary || (localNode ? `Module ${nodeId} in project.` : 'No summary available.');
-      const inCount = aiResult?.incoming_dependencies?.length ?? localNode?.incoming_count ?? 0;
-      const riskScore = aiResult?.risk_score ?? (inCount >= 2 ? 4 : (inCount === 1 ? 2 : 1));
-      const riskLevel = aiResult?.risk_level || (riskScore >= 4 ? 'Critical Bottleneck' : (riskScore >= 2 ? 'Moderate' : 'Safe'));
-      const blastRadius = aiResult?.blast_radius_warning || 'Downstream impact analysis pending.';
-      const provider = aiResult?.provider || 'Architecture Engine';
-      const incoming = aiResult?.incoming_dependencies || localNode?.incoming_dependencies || [];
-      const outgoing = aiResult?.outgoing_dependencies || localNode?.outgoing_dependencies || [];
-
-      // Sleek Status Pills
-      let pillHtml = `<span class="risk-pill pill-safe">● Safe / Low Impact (${riskScore}/5)</span>`;
-      let meterClass = 'low';
-
-      if (riskScore >= 4 || inCount >= 2) {
-        pillHtml = `<span class="risk-pill pill-critical">● Critical Bottleneck (${riskScore}/5)</span>`;
-        meterClass = 'high';
-      } else if (riskScore >= 2 || inCount === 1) {
-        pillHtml = `<span class="risk-pill pill-moderate">● Moderate Impact (${riskScore}/5)</span>`;
-        meterClass = 'medium';
+    // EVENT LISTENERS BINDING
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Analyze Button & Input Enter
+      const btnAnalyze = document.getElementById('btn-analyze');
+      const repoUrlInput = document.getElementById('repo-url');
+      if (btnAnalyze && repoUrlInput) {
+        btnAnalyze.addEventListener('click', () => {
+          cloneAndScanRepo(repoUrlInput.value.trim());
+        });
+        repoUrlInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            cloneAndScanRepo(repoUrlInput.value.trim());
+          }
+        });
       }
 
-      const incomingHtml = incoming.length > 0
-        ? incoming.map(dep => `
-            <div class="dep-item" onclick="focusNode('${dep}')">
-              <span>${dep}</span>
-              <span class="dep-arrow">→ calls this</span>
-            </div>
-          `).join('')
-        : `<div class="no-deps">Root module (No incoming dependencies)</div>`;
-
-      const outgoingHtml = outgoing.length > 0
-        ? outgoing.map(dep => `
-            <div class="dep-item" onclick="focusNode('${dep}')">
-              <span>${dep}</span>
-              <span class="dep-arrow">imported →</span>
-            </div>
-          `).join('')
-        : `<div class="no-deps">Leaf module (No external dependencies)</div>`;
-
-      const matchBannerHtml = matchReason ? `
-        <div class="search-match-banner">
-          <svg class="search-match-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          <div>
-            <div class="search-match-title">Architecture Query Match</div>
-            <div class="search-match-text">${matchReason}</div>
-          </div>
-        </div>
-      ` : '';
-
-      sidebarContent.innerHTML = `
-        ${matchBannerHtml}
-
-        <!-- File Header Card with Sleek Risk Pill -->
-        <div class="card file-header-card">
-          <div class="file-path">${filePath}</div>
-          <div class="file-title-row">
-            <span class="file-title">${localNode?.label || nodeId}</span>
-            ${pillHtml}
-          </div>
-
-          <div class="risk-meter-container">
-            <div class="risk-meter-header">
-              <span>Architecture Blast Risk</span>
-              <span>Score ${riskScore}/5</span>
-            </div>
-            <div class="meter-track">
-              <div class="meter-fill ${meterClass}"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- AI Summary Card -->
-        <div class="card ai-summary-box">
-          <div class="section-label">
-            <span>AI Code Summary</span>
-            <span style="font-size:0.65rem; color:#a5b4fc; background:rgba(99,102,241,0.18); padding:2px 6px; border-radius:4px;">AI Verified</span>
-          </div>
-          <p class="summary-text">${summary}</p>
-          <div class="provider-tag">
-            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            <span>Analyzed via ${provider}</span>
-          </div>
-        </div>
-
-        <!-- Direct Blast Radius Impact Box with Glowing CTA Button -->
-        <div class="card blast-radius-box ${riskScore <= 2 ? 'low-risk' : ''}">
-          <div class="blast-title ${riskScore >= 3 ? 'red' : 'green'}">
-            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-            </svg>
-            <span>Direct Blast Radius Impact</span>
-          </div>
-          <p class="blast-desc">${blastRadius}</p>
-
-          <button class="btn-blast" id="btn-trigger-blast" onclick="simulateBlastRadius('${nodeId}')">
-            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            <span>⚡ Simulate Blast Radius</span>
-          </button>
-        </div>
-
-        <!-- Incoming Dependencies -->
-        <div class="dep-section">
-          <div class="section-label">
-            <span>Imported By (${incoming.length})</span>
-            <span style="font-size: 0.68rem; color: var(--accent-cyan);">Inbound</span>
-          </div>
-          <div class="dep-list">
-            ${incomingHtml}
-          </div>
-        </div>
-
-        <!-- Outgoing Dependencies -->
-        <div class="dep-section">
-          <div class="section-label">
-            <span>Imports (${outgoing.length})</span>
-            <span style="font-size: 0.68rem; color: var(--accent-purple);">Outbound</span>
-          </div>
-          <div class="dep-list">
-            ${outgoingHtml}
-          </div>
-        </div>
-      `;
-    }
-
-    function resetSidebar() {
-      const sidebarContent = document.getElementById('sidebar-content');
-      sidebarContent.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
-            </svg>
-          </div>
-          <p style="font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">Select a Module or Ask a Question</p>
-          <p style="font-size: 0.8rem; line-height: 1.4;">Paste any public GitHub repository URL above, or click any bubble to inspect architecture.</p>
-        </div>
-      `;
-    }
-
-    function focusNode(nodeId) {
-      if (!network) return;
-      clearPulse();
-      network.selectNodes([nodeId]);
-      network.focus(nodeId, {
-        scale: 1.3,
-        animation: { duration: 500, easingFunction: 'easeInOutQuad' }
-      });
-      inspectNodeWithAi(nodeId);
-    }
-
-    // Toggle Test Files
-    document.getElementById('btn-toggle-tests').addEventListener('click', () => {
-      hideTestsEnabled = !hideTestsEnabled;
-      const btn = document.getElementById('btn-toggle-tests');
-      const icon = document.getElementById('test-toggle-icon');
-      const label = document.getElementById('test-toggle-label');
-
-      if (hideTestsEnabled) {
-        btn.classList.add('active');
-        icon.textContent = '🕶️';
-        label.textContent = 'Show Tests';
-        showToast('Test files hidden from graph');
-      } else {
-        btn.classList.remove('active');
-        icon.textContent = '👁️';
-        label.textContent = 'Hide Tests';
-        showToast('All files visible');
+      // Search Button & Input Enter
+      const btnSearch = document.getElementById('btn-search');
+      const searchInput = document.getElementById('search-query');
+      if (btnSearch && searchInput) {
+        btnSearch.addEventListener('click', handleArchitectureSearch);
+        searchInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            handleArchitectureSearch();
+          }
+        });
       }
 
-      if (rawGraphData) {
-        initNetwork(rawGraphData);
+      // Toggle Tests
+      const btnToggleTests = document.getElementById('toggle-tests');
+      if (btnToggleTests) {
+        btnToggleTests.addEventListener('click', () => {
+          hideTestsEnabled = !hideTestsEnabled;
+          const label = document.getElementById('toggle-tests-label');
+          const icon = document.getElementById('toggle-tests-icon');
+
+          if (hideTestsEnabled) {
+            btnToggleTests.classList.add('bg-indigo-600/30', 'border-indigo-500/60', 'text-white');
+            if (label) label.textContent = 'Show Tests';
+            if (icon) icon.className = 'fa-solid fa-eye text-xs text-indigo-400';
+            showToast('Test files hidden from graph');
+          } else {
+            btnToggleTests.classList.remove('bg-indigo-600/30', 'border-indigo-500/60', 'text-white');
+            if (label) label.textContent = 'Hide Tests';
+            if (icon) icon.className = 'fa-solid fa-eye-slash text-xs text-amber-400';
+            showToast('All files visible');
+          }
+
+          if (rawGraphData) {
+            initNetwork(rawGraphData);
+          }
+        });
       }
-    });
 
-    // Ingestion Events
-    document.getElementById('btn-clone-repo').addEventListener('click', () => {
-      const url = document.getElementById('clone-repo-input').value.trim();
-      if (url) cloneAndScanRepo(url);
-    });
-    document.getElementById('clone-repo-input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const url = e.target.value.trim();
-        if (url) cloneAndScanRepo(url);
+      // Fit View
+      const btnFit = document.getElementById('btn-fit');
+      if (btnFit) {
+        btnFit.addEventListener('click', () => {
+          if (network) network.fit({ animation: { duration: 400 } });
+        });
       }
-    });
 
-    // Search Events
-    document.getElementById('btn-search-architecture').addEventListener('click', handleArchitectureSearch);
-    document.getElementById('architecture-query-input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        handleArchitectureSearch();
+      // Reset Graph
+      const btnReset = document.getElementById('btn-reset');
+      if (btnReset) {
+        btnReset.addEventListener('click', () => {
+          resetGraphView();
+          resetInspector();
+        });
       }
-    });
 
-    // View Controls
-    document.getElementById('btn-reset-graph').addEventListener('click', resetGraphView);
-    document.getElementById('btn-clear-blast').addEventListener('click', resetGraphView);
-
-    document.getElementById('btn-fit').addEventListener('click', () => {
-      if (network) network.fit({ animation: { duration: 400 } });
-    });
-
-    document.getElementById('ctrl-zoom-in').addEventListener('click', () => {
-      if (network) {
-        const scale = network.getScale();
-        network.moveTo({ scale: scale * 1.3, animation: { duration: 250 } });
+      // Clear Blast Banner
+      const btnClearBlast = document.getElementById('btn-clear-blast');
+      if (btnClearBlast) {
+        btnClearBlast.addEventListener('click', resetGraphView);
       }
-    });
 
-    document.getElementById('ctrl-zoom-out').addEventListener('click', () => {
-      if (network) {
-        const scale = network.getScale();
-        network.moveTo({ scale: scale / 1.3, animation: { duration: 250 } });
+      // Close Inspector Panel
+      const btnCloseInspector = document.getElementById('btn-close-inspector');
+      if (btnCloseInspector) {
+        btnCloseInspector.addEventListener('click', resetInspector);
       }
-    });
 
-    document.getElementById('ctrl-physics').addEventListener('click', (e) => {
-      physicsEnabled = !physicsEnabled;
-      if (network) {
-        network.setOptions({ physics: { enabled: physicsEnabled } });
+      // Zoom In / Zoom Out / Physics Controls
+      const btnZoomIn = document.getElementById('ctrl-zoom-in');
+      const btnZoomOut = document.getElementById('ctrl-zoom-out');
+      const btnPhysics = document.getElementById('ctrl-physics');
+
+      if (btnZoomIn) {
+        btnZoomIn.addEventListener('click', () => {
+          if (network) {
+            const scale = network.getScale();
+            network.moveTo({ scale: scale * 1.3, animation: { duration: 250 } });
+          }
+        });
       }
-      e.currentTarget.style.color = physicsEnabled ? 'var(--text-primary)' : 'var(--text-muted)';
-    });
 
-    // Boot
-    window.addEventListener('DOMContentLoaded', async () => {
+      if (btnZoomOut) {
+        btnZoomOut.addEventListener('click', () => {
+          if (network) {
+            const scale = network.getScale();
+            network.moveTo({ scale: scale / 1.3, animation: { duration: 250 } });
+          }
+        });
+      }
+
+      if (btnPhysics) {
+        btnPhysics.addEventListener('click', (e) => {
+          physicsEnabled = !physicsEnabled;
+          if (network) {
+            network.setOptions({ physics: { enabled: physicsEnabled } });
+          }
+          btnPhysics.classList.toggle('text-amber-400', physicsEnabled);
+          btnPhysics.classList.toggle('text-slate-500', !physicsEnabled);
+        });
+      }
+
+      // Boot application
       const data = await fetchGraphData();
       initNetwork(data);
     });
