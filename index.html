@@ -183,6 +183,15 @@
       </div>
 
         <button 
+          id="btn-toggle-sandbox" 
+          class="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+          title="Toggle Architecture Refactoring Sandbox (What-If Mode)"
+        >
+          <i class="fa-solid fa-flask-vial text-xs text-emerald-400"></i>
+          <span>🧪 What-If Sandbox</span>
+        </button>
+
+        <button 
           id="btn-toggle-timetravel" 
           class="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 text-amber-300 hover:text-amber-200 border border-amber-500/30 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
           title="Open Git History Time-Travel Scrubber"
@@ -236,6 +245,28 @@
       </div>
       <button id="btn-clear-blast" class="px-2.5 py-0.5 bg-orange-600/60 hover:bg-orange-600 text-white rounded-lg text-[11px] font-semibold transition-all">
         Clear Wave
+      </button>
+    </div>
+
+    <!-- Active What-If Architecture Sandbox Floating Banner -->
+    <div id="sandbox-status-banner" class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-emerald-950/85 backdrop-blur-md border border-emerald-500/50 rounded-xl px-4 py-2 text-xs text-emerald-200 shadow-2xl flex items-center gap-3 animate-bounce-subtle">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-scissors text-emerald-400 text-sm animate-pulse"></i>
+        <span><strong>What-If Sandbox:</strong> Click any connection line to sever & test refactoring (<strong id="sandbox-severed-count" class="text-white font-mono">0</strong> severed)</span>
+      </div>
+      <button id="btn-reset-sandbox" class="px-2.5 py-0.5 bg-emerald-600/70 hover:bg-emerald-600 text-white rounded-lg text-[11px] font-semibold transition-all shadow-md active:scale-95">
+        Reset Sandbox
+      </button>
+    </div>
+
+    <!-- Active Module Outage / SPOF Blackout Floating Banner -->
+    <div id="outage-status-banner" class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-red-950/90 backdrop-blur-md border border-red-500/60 rounded-xl px-4 py-2.5 text-xs text-red-100 shadow-2xl flex items-center gap-3 animate-bounce-subtle">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-triangle-exclamation text-red-400 text-base animate-pulse"></i>
+        <span>💥 <strong>Outage Impact:</strong> <span id="outage-percentage" class="text-red-300 font-bold font-mono text-sm">0%</span> of system services knocked offline (<strong id="outage-failed-count" class="text-white">0</strong>/<span id="outage-total-count">0</span> modules failed due to <strong id="outage-root-node" class="font-mono text-red-200"></strong> outage).</span>
+      </div>
+      <button id="btn-clear-outage" class="px-3 py-1 bg-red-600/80 hover:bg-red-500 text-white rounded-lg text-xs font-semibold transition-all shadow-md active:scale-95">
+        🔄 Restore Services
       </button>
     </div>
 
@@ -459,6 +490,14 @@
             <i class="fa-solid fa-bolt-lightning text-xs"></i>
             <span>⚡ Simulate Blast Radius</span>
           </button>
+          <button 
+            id="btn-simulate-outage" 
+            class="w-full py-2.5 px-4 bg-gradient-to-r from-red-700 via-rose-700 to-red-800 hover:from-red-600 hover:to-rose-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-red-700/30 hover:shadow-red-700/50 active:scale-95 transition-all mt-1"
+            title="Simulate complete outage of this module and observe downstream service blackout"
+          >
+            <i class="fa-solid fa-power-off text-xs text-red-200"></i>
+            <span>💥 Simulate Service Outage</span>
+          </button>
         </div>
 
         <!-- Inbound Dependencies (Imported By) -->
@@ -509,6 +548,15 @@
     let isBlastModeActive = false;
     let blastTargetNodeId = null;
     let blastAffectedNodes = [];
+
+    // Architecture Sandbox (What-If Mode) State
+    let isSandboxModeActive = false;
+    let severedEdgeIds = new Set();
+
+    // Module Outage / SPOF Blackout State
+    let isOutageModeActive = false;
+    let outageRootNodeId = null;
+    let outageAffectedNodes = [];
 
     // Git History Time Travel Scrubber State
     let gitCommits = [];
@@ -816,16 +864,20 @@
       network.on("click", function (params) {
         if (params.nodes && params.nodes.length > 0) {
           openModuleInspector(params.nodes[0]);
+        } else if (isSandboxModeActive && params.edges && params.edges.length > 0) {
+          severEdge(params.edges[0]);
         } else {
           clearPulse();
-          if (!isBlastModeActive && !isTimeTravelActive) {
+          if (!isBlastModeActive && !isTimeTravelActive && !isOutageModeActive) {
             resetInspector();
           }
         }
       });
 
       network.on('hoverNode', () => { container.style.cursor = 'pointer'; });
-      network.on('blurNode', () => { container.style.cursor = 'default'; });
+      network.on('blurNode', () => { container.style.cursor = isSandboxModeActive ? 'crosshair' : 'default'; });
+      network.on('hoverEdge', () => { if (isSandboxModeActive) container.style.cursor = 'crosshair'; });
+      network.on('blurEdge', () => { container.style.cursor = isSandboxModeActive ? 'crosshair' : 'default'; });
     }
 
     // Open Module Inspector Drawer and Populate Details
@@ -857,6 +909,7 @@
       const inboundCount = document.getElementById('inbound-count-badge');
       const outboundCount = document.getElementById('outbound-count-badge');
       const btnBlast = document.getElementById('btn-blast-radius');
+      const btnOutage = document.getElementById('btn-simulate-outage');
 
       if (emptyState) emptyState.classList.add('hidden');
       if (activeState) activeState.classList.remove('hidden');
@@ -876,6 +929,11 @@
       if (btnBlast) {
         btnBlast.disabled = false;
         btnBlast.onclick = () => simulateBlastRadius(nodeId);
+      }
+
+      if (btnOutage) {
+        btnOutage.disabled = false;
+        btnOutage.onclick = () => simulateModuleOutage(nodeId);
       }
 
       if (matchReason && matchBanner && matchReasonEl) {
@@ -1206,10 +1264,16 @@
       isBlastModeActive = false;
       blastTargetNodeId = null;
       blastAffectedNodes = [];
+      isOutageModeActive = false;
+      outageRootNodeId = null;
+      outageAffectedNodes = [];
       clearPulse();
 
-      const banner = document.getElementById('blast-status-banner');
-      if (banner) banner.classList.add('hidden');
+      const blastBanner = document.getElementById('blast-status-banner');
+      if (blastBanner) blastBanner.classList.add('hidden');
+
+      const outageBanner = document.getElementById('outage-status-banner');
+      if (outageBanner) outageBanner.classList.add('hidden');
 
       if (rawGraphData) {
         initNetwork(rawGraphData);
@@ -1218,6 +1282,320 @@
       if (network) {
         network.fit({ animation: { duration: 500 } });
       }
+    }
+
+    // ==========================================
+    // FEATURE 1: "WHAT-IF" ARCHITECTURAL SANDBOX
+    // ==========================================
+
+    // Toggle "What-If" Architectural Sandbox Mode
+    function toggleSandboxMode() {
+      isSandboxModeActive = !isSandboxModeActive;
+      const btn = document.getElementById('btn-toggle-sandbox');
+      const banner = document.getElementById('sandbox-status-banner');
+      const container = document.getElementById('graph-canvas');
+
+      if (isSandboxModeActive) {
+        if (isBlastModeActive) resetGraphView();
+        if (isTimeTravelActive) closeTimeTravelDock();
+        if (isOutageModeActive) clearOutageSimulation();
+
+        if (btn) {
+          btn.classList.add('bg-emerald-600/30', 'border-emerald-500/60', 'text-white', 'shadow-lg', 'shadow-emerald-500/20');
+        }
+        if (banner) banner.classList.remove('hidden');
+        if (container) container.style.cursor = 'crosshair';
+
+        const severedCountEl = document.getElementById('sandbox-severed-count');
+        if (severedCountEl) severedCountEl.textContent = severedEdgeIds.size;
+
+        showToast("🧪 What-If Sandbox Active: Click any edge connection line to sever it & test refactoring.");
+      } else {
+        if (btn) {
+          btn.classList.remove('bg-emerald-600/30', 'border-emerald-500/60', 'text-white', 'shadow-lg', 'shadow-emerald-500/20');
+        }
+        if (banner) banner.classList.add('hidden');
+        if (container) container.style.cursor = 'default';
+
+        showToast("What-If Sandbox closed.");
+      }
+    }
+
+    // Sever an Edge Connection in What-If Sandbox Mode
+    function severEdge(edgeId) {
+      if (!isSandboxModeActive || !edgesDataSet || !nodesDataSet) return;
+      if (severedEdgeIds.has(edgeId)) return;
+
+      const edgeObj = edgesDataSet.get(edgeId);
+      if (!edgeObj) return;
+
+      severedEdgeIds.add(edgeId);
+      edgesDataSet.remove({ id: edgeId });
+
+      // Recalculate dynamic bottleneck state & node sizing based on remaining active edges
+      const remainingEdges = edgesDataSet.get();
+      const inDegreeMap = {};
+      remainingEdges.forEach(e => {
+        inDegreeMap[e.to] = (inDegreeMap[e.to] || 0) + 1;
+      });
+
+      const nodeUpdates = [];
+      const currentNodes = nodesDataSet.get();
+      let resolvedBottleneck = false;
+      let targetNodeName = edgeObj.to;
+
+      currentNodes.forEach(node => {
+        const newInDegree = inDegreeMap[node.id] || 0;
+        const isBottleneck = newInDegree >= 2;
+        const dynamicRadius = Math.min(42, 18 + (newInDegree * 4));
+
+        nodeUpdates.push({
+          id: node.id,
+          size: dynamicRadius,
+          borderWidth: isBottleneck ? 3 : 2,
+          color: {
+            background: isBottleneck ? '#2d0b14' : '#0d1527',
+            border: isBottleneck ? '#f43f5e' : '#38bdf8',
+            highlight: {
+              background: isBottleneck ? '#4c111e' : '#13223f',
+              border: isBottleneck ? '#fb7185' : '#7dd3fc'
+            },
+            hover: {
+              background: isBottleneck ? '#4c111e' : '#13223f',
+              border: isBottleneck ? '#fb7185' : '#7dd3fc'
+            }
+          },
+          font: {
+            color: '#ffffff',
+            size: 13,
+            face: 'system-ui, -apple-system, sans-serif',
+            background: '#0f172a',
+            strokeWidth: 2,
+            strokeColor: '#0f172a',
+            margin: 5
+          }
+        });
+
+        if (node.id === edgeObj.to && !isBottleneck) {
+          resolvedBottleneck = true;
+          targetNodeName = node.label || node.id;
+        }
+      });
+
+      nodesDataSet.update(nodeUpdates);
+
+      // Update HUD stats in real time
+      const bottlenecksCount = currentNodes.filter(n => (inDegreeMap[n.id] || 0) >= 2).length;
+      const modEl = document.getElementById('hud-modules');
+      const depEl = document.getElementById('hud-deps');
+      const botEl = document.getElementById('hud-bottlenecks');
+      if (modEl) modEl.textContent = currentNodes.length;
+      if (depEl) depEl.textContent = remainingEdges.length;
+      if (botEl) botEl.textContent = bottlenecksCount;
+
+      const severedCountEl = document.getElementById('sandbox-severed-count');
+      if (severedCountEl) severedCountEl.textContent = severedEdgeIds.size;
+
+      if (resolvedBottleneck) {
+        showToast(`🎉 Refactor Success: Severed connection to '${targetNodeName}'! Bottleneck resolved (High-Risk red ➔ Safe cyan).`);
+      } else {
+        const remainingIn = inDegreeMap[edgeObj.to] || 0;
+        showToast(`Severed connection: ${edgeObj.from} ➔ ${edgeObj.to} (${remainingIn} inbound remaining)`);
+      }
+    }
+
+    // Reset Sandbox Architecture to Baseline
+    function resetSandbox() {
+      severedEdgeIds.clear();
+      const countEl = document.getElementById('sandbox-severed-count');
+      if (countEl) countEl.textContent = '0';
+
+      if (rawGraphData) {
+        initNetwork(rawGraphData);
+      }
+      showToast("Sandbox reset: original architecture and connections restored.");
+    }
+
+    // ====================================================
+    // FEATURE 2: SIMULATE MODULE OUTAGE / SPOF BLACKOUT
+    // ====================================================
+
+    // Simulate complete service outage of a module and observe cascading blackout
+    async function simulateModuleOutage(targetNodeId) {
+      if (!rawGraphData) return;
+
+      if (isTimeTravelActive) closeTimeTravelDock();
+      if (isBlastModeActive) resetGraphView();
+      if (isSandboxModeActive) toggleSandboxMode();
+
+      isOutageModeActive = true;
+      outageRootNodeId = targetNodeId;
+      clearPulse();
+
+      const blastResult = await fetchBlastRadiusApi(targetNodeId);
+      const affectedNodes = blastResult?.affected_nodes || [];
+      outageAffectedNodes = affectedNodes;
+      const affectedSet = new Set(affectedNodes);
+
+      const visibleNodesList = hideTestsEnabled
+        ? rawGraphData.nodes.filter(n => !n.is_test)
+        : rawGraphData.nodes;
+
+      const totalModules = visibleNodesList.length;
+      const failedCount = 1 + affectedNodes.length;
+      const percentage = Math.min(100, Math.round((failedCount / Math.max(1, totalModules)) * 100));
+
+      const banner = document.getElementById('outage-status-banner');
+      const percentageEl = document.getElementById('outage-percentage');
+      const failedCountEl = document.getElementById('outage-failed-count');
+      const totalCountEl = document.getElementById('outage-total-count');
+      const rootNodeEl = document.getElementById('outage-root-node');
+
+      if (banner && percentageEl && failedCountEl && totalCountEl && rootNodeEl) {
+        percentageEl.textContent = `${percentage}%`;
+        failedCountEl.textContent = failedCount;
+        totalCountEl.textContent = totalModules;
+        rootNodeEl.textContent = targetNodeId;
+        banner.classList.remove('hidden');
+      }
+
+      // Update Node Styling for Service Blackout
+      const nodeUpdates = [];
+      nodesDataSet.forEach(node => {
+        const id = node.id;
+        const baseSize = 22;
+
+        if (id === targetNodeId) {
+          // Critical Failed Root Module: Pulsing Red Alert State
+          nodeUpdates.push({
+            id: id,
+            size: baseSize + 8,
+            borderWidth: 4,
+            color: {
+              background: '#991b1b',
+              border: '#fca5a5',
+              highlight: { background: '#7f1d1d', border: '#ffffff' },
+              hover: { background: '#7f1d1d', border: '#ffffff' }
+            },
+            shadow: { enabled: false },
+            font: {
+              color: '#ffffff',
+              size: 13,
+              face: 'system-ui, -apple-system, sans-serif',
+              background: '#7f1d1d',
+              strokeWidth: 2,
+              strokeColor: '#7f1d1d',
+              margin: 5
+            }
+          });
+        } else if (affectedSet.has(id)) {
+          // Knocked-Offline Dependent Nodes: Blackout Charcoal Red with Warning Outlines
+          nodeUpdates.push({
+            id: id,
+            size: 18,
+            borderWidth: 2.5,
+            color: {
+              background: '#1c0a0e',
+              border: '#ef4444',
+              highlight: { background: '#2c0d13', border: '#f87171' },
+              hover: { background: '#2c0d13', border: '#f87171' }
+            },
+            shadow: { enabled: false },
+            font: {
+              color: '#f87171',
+              size: 12,
+              face: 'system-ui, -apple-system, sans-serif',
+              background: '#1c0a0e',
+              strokeWidth: 2,
+              strokeColor: '#1c0a0e',
+              margin: 5
+            }
+          });
+        } else {
+          // Unaffected Nodes: Dimmed Online State
+          nodeUpdates.push({
+            id: id,
+            size: 14,
+            borderWidth: 1,
+            color: {
+              background: 'rgba(15, 23, 42, 0.35)',
+              border: 'rgba(71, 85, 105, 0.35)',
+              highlight: { background: 'rgba(30, 41, 59, 0.5)', border: '#64748b' },
+              hover: { background: 'rgba(30, 41, 59, 0.5)', border: '#64748b' }
+            },
+            shadow: { enabled: false },
+            font: {
+              color: 'rgba(148, 163, 184, 0.45)',
+              size: 11,
+              face: 'system-ui, -apple-system, sans-serif',
+              background: 'rgba(15, 23, 42, 0.35)',
+              strokeWidth: 1,
+              strokeColor: 'transparent',
+              margin: 4
+            }
+          });
+        }
+      });
+      nodesDataSet.update(nodeUpdates);
+
+      // Broken / Severed Red Dashed Edges for Outage Flow
+      const edgeUpdates = [];
+      edgesDataSet.forEach(edge => {
+        const isImpactedFlow = (edge.to === targetNodeId) || 
+                               (affectedSet.has(edge.from) && (edge.to === targetNodeId || affectedSet.has(edge.to)));
+
+        if (isImpactedFlow) {
+          edgeUpdates.push({
+            id: edge.id,
+            width: 2.5,
+            color: {
+              color: '#ef4444',
+              highlight: '#f87171',
+              hover: '#f87171',
+              opacity: 1.0
+            },
+            dashes: [6, 4],
+            arrows: { to: { enabled: true, scaleFactor: 0.7 } }
+          });
+        } else {
+          edgeUpdates.push({
+            id: edge.id,
+            width: 1.0,
+            color: {
+              color: 'rgba(71, 85, 105, 0.1)',
+              opacity: 0.1
+            },
+            dashes: false,
+            arrows: { to: { enabled: true, scaleFactor: 0.3 } }
+          });
+        }
+      });
+      edgesDataSet.update(edgeUpdates);
+
+      if (network) {
+        const focusIds = [targetNodeId, ...affectedNodes];
+        network.fit({
+          nodes: focusIds,
+          animation: { duration: 600, easingFunction: 'easeInOutQuad' }
+        });
+      }
+
+      showToast(`💥 Outage simulation active: ${failedCount} module(s) knocked offline (${percentage}% of system)!`, true);
+    }
+
+    // Restore Services / Clear Outage Simulation
+    function clearOutageSimulation() {
+      isOutageModeActive = false;
+      outageRootNodeId = null;
+      outageAffectedNodes = [];
+
+      const banner = document.getElementById('outage-status-banner');
+      if (banner) banner.classList.add('hidden');
+
+      if (rawGraphData) {
+        initNetwork(rawGraphData);
+      }
+      showToast("All system services restored to normal online state.");
     }
 
     // Git History Time-Travel Scrubber Engine
@@ -1534,6 +1912,24 @@
         });
       }
 
+      // What-If Sandbox Toggle Header Button
+      const btnToggleSandbox = document.getElementById('btn-toggle-sandbox');
+      if (btnToggleSandbox) {
+        btnToggleSandbox.addEventListener('click', toggleSandboxMode);
+      }
+
+      // Reset Sandbox Button in Banner
+      const btnResetSandbox = document.getElementById('btn-reset-sandbox');
+      if (btnResetSandbox) {
+        btnResetSandbox.addEventListener('click', resetSandbox);
+      }
+
+      // Clear Outage Button in Banner
+      const btnClearOutage = document.getElementById('btn-clear-outage');
+      if (btnClearOutage) {
+        btnClearOutage.addEventListener('click', clearOutageSimulation);
+      }
+
       // Time Travel Toggle Header Button
       const btnToggleTimeTravel = document.getElementById('btn-toggle-timetravel');
       if (btnToggleTimeTravel) {
@@ -1609,6 +2005,10 @@
           if (isTimeTravelActive) {
             closeTimeTravelDock();
           }
+          if (isSandboxModeActive) {
+            toggleSandboxMode();
+          }
+          severedEdgeIds.clear();
           resetGraphView();
           resetInspector();
         });
