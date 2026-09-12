@@ -503,17 +503,14 @@
     let physicsEnabled = true;
     let hideTestsEnabled = false;
     let activePulseNodeId = null;
-    let pulseInterval = null;
     let currentlySelectedNodeId = null;
 
-    // Visual Feature 1: Blast Radius Particle Wave State
+    // Blast Radius State (Static High-Contrast Highlight)
     let isBlastModeActive = false;
     let blastTargetNodeId = null;
     let blastAffectedNodes = [];
-    let blastAnimationId = null;
-    let blastStartTime = 0;
 
-    // Visual Feature 2: Git History Time Travel Scrubber State
+    // Git History Time Travel Scrubber State
     let gitCommits = [];
     let currentCommitIndex = 0;
     let isTimeTravelAutoPlaying = false;
@@ -700,11 +697,11 @@
 
       updateStatsHUD(visibleNodesList, visibleEdgesList);
 
-      // Format nodes: glowing glass orbs with dark translucent fills and neon borders
+      // Format nodes: crisp high-contrast styling with solid background label badges
       const formattedNodes = visibleNodesList.map(node => {
         const inDegree = node.incoming_count || 0;
         const isBottleneck = inDegree >= 2;
-        const dynamicRadius = Math.min(45, 18 + (inDegree * 4));
+        const dynamicRadius = Math.min(42, 18 + (inDegree * 4));
 
         return {
           id: node.id,
@@ -724,26 +721,20 @@
             }
           },
           borderWidth: isBottleneck ? 3 : 2,
-          shadow: {
-            enabled: true,
-            color: isBottleneck ? 'rgba(244, 63, 94, 0.6)' : 'rgba(56, 189, 248, 0.4)',
-            size: isBottleneck ? 15 : 10,
-            x: 0,
-            y: 0
-          },
+          shadow: { enabled: false },
           font: {
-            face: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-            size: 12,
-            color: '#e2e8f0',
-            strokeWidth: 0,
-            background: 'rgba(15, 23, 42, 0.85)',
-            strokeColor: 'rgba(51, 65, 85, 0.5)',
-            margin: 6
+            color: '#ffffff',
+            size: 13,
+            face: 'system-ui, -apple-system, sans-serif',
+            background: '#0f172a', // Solid dark container behind text
+            strokeWidth: 2,
+            strokeColor: '#0f172a',
+            margin: 5
           }
         };
       });
 
-      // Format edges: smooth continuous neon edges, scaleFactor 0.5, width 1.5
+      // Format edges: smooth continuous lines with directional arrows
       const formattedEdges = visibleEdgesList.map(edge => ({
         id: `${edge.from}->${edge.to}`,
         from: edge.from,
@@ -756,7 +747,7 @@
           }
         },
         color: {
-          color: 'rgba(100, 116, 139, 0.25)',
+          color: 'rgba(100, 116, 139, 0.35)',
           highlight: '#38bdf8',
           hover: '#38bdf8'
         },
@@ -770,15 +761,16 @@
       nodesDataSet = new vis.DataSet(formattedNodes);
       edgesDataSet = new vis.DataSet(formattedEdges);
 
+      // Loosen physics to increase node spacing and avoid overlapping labels
       const options = {
         nodes: {
-          scaling: { min: 18, max: 45 }
+          scaling: { min: 18, max: 42 }
         },
         edges: {
           selectionWidth: 2.5,
           smooth: { type: 'continuous', roundness: 0.3 },
           color: {
-            color: 'rgba(100, 116, 139, 0.25)',
+            color: 'rgba(100, 116, 139, 0.35)',
             highlight: '#38bdf8',
             hover: '#38bdf8'
           },
@@ -789,11 +781,11 @@
           enabled: physicsEnabled,
           solver: 'forceAtlas2Based',
           forceAtlas2Based: {
-            gravitationalConstant: -60,
-            centralGravity: 0.012,
-            springLength: 120,
-            springConstant: 0.06,
-            damping: 0.4,
+            gravitationalConstant: -120, // Stronger repulsion to spread nodes
+            centralGravity: 0.008,
+            springLength: 180,           // Longer lines so nodes don't bunch
+            springConstant: 0.05,
+            damping: 0.5,
             avoidOverlap: 1.0
           },
           stabilization: { iterations: 160 }
@@ -814,103 +806,6 @@
       }
 
       network = new vis.Network(container, { nodes: nodesDataSet, edges: edgesDataSet }, options);
-
-      // Canvas Rendering Hook: Animated Blast Radius Particle Wave & Pulsating Auras
-      network.on("afterDrawing", function (ctx) {
-        if (!isBlastModeActive || !blastTargetNodeId || !network) return;
-
-        const t = (performance.now() - blastStartTime) / 1000;
-        const allBlastNodes = [blastTargetNodeId, ...blastAffectedNodes];
-        const positions = network.getPositions(allBlastNodes);
-
-        // 1. Draw pulsating resonant glowing auras on affected nodes
-        allBlastNodes.forEach((nodeId, idx) => {
-          const pos = positions[nodeId];
-          if (!pos) return;
-
-          const isTarget = nodeId === blastTargetNodeId;
-          const phaseOffset = isTarget ? 0 : (idx * 0.45);
-          const baseColor = isTarget ? '#f43f5e' : '#fb923c';
-          const rgbaBase = isTarget ? 'rgba(244, 63, 94, ' : 'rgba(251, 146, 60, ';
-
-          // Resonant inner aura ring
-          const pulseR = (isTarget ? 30 : 25) + 4.5 * Math.sin(t * (isTarget ? 4 : 3.5) + phaseOffset);
-          const auraAlpha = 0.55 + 0.35 * Math.sin(t * (isTarget ? 4 : 3.5) + phaseOffset);
-
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(pos.x, pos.y, pulseR, 0, 2 * Math.PI);
-          ctx.strokeStyle = rgbaBase + auraAlpha + ')';
-          ctx.lineWidth = isTarget ? 3.5 : 2.5;
-          ctx.shadowColor = baseColor;
-          ctx.shadowBlur = isTarget ? 22 : 15;
-          ctx.stroke();
-
-          // Expanding shockwave aura wave
-          const wavePhase = ((t * (isTarget ? 1.3 : 1.1)) + phaseOffset) % 1.0;
-          const waveR = (isTarget ? 24 : 20) + wavePhase * (isTarget ? 35 : 28);
-          const waveAlpha = (1 - wavePhase) * (isTarget ? 0.75 : 0.6);
-
-          ctx.beginPath();
-          ctx.arc(pos.x, pos.y, waveR, 0, 2 * Math.PI);
-          ctx.strokeStyle = rgbaBase + waveAlpha + ')';
-          ctx.lineWidth = 1.8;
-          ctx.stroke();
-          ctx.restore();
-        });
-
-        // 2. Animate glowing plasma particle pulses traveling along connecting edges
-        if (rawGraphData && rawGraphData.edges) {
-          const relevantEdges = rawGraphData.edges.filter(e => 
-            (e.from === blastTargetNodeId || blastAffectedNodes.includes(e.from)) &&
-            (e.to === blastTargetNodeId || blastAffectedNodes.includes(e.to))
-          );
-
-          relevantEdges.forEach(edge => {
-            const p1 = positions[edge.from] || network.getPosition(edge.from);
-            const p2 = positions[edge.to] || network.getPosition(edge.to);
-            if (!p1 || !p2) return;
-
-            // Render 3 traveling plasma particles with staggered phases
-            for (let pIdx = 0; pIdx < 3; pIdx++) {
-              const progress = ((t * 0.95) + (pIdx / 3.0)) % 1.0;
-              const px = p1.x + (p2.x - p1.x) * progress;
-              const py = p1.y + (p2.y - p1.y) * progress;
-
-              ctx.save();
-
-              // Particle tail
-              const tailProg = Math.max(0, progress - 0.06);
-              const tx = p1.x + (p2.x - p1.x) * tailProg;
-              const ty = p1.y + (p2.y - p1.y) * tailProg;
-
-              ctx.beginPath();
-              ctx.moveTo(tx, ty);
-              ctx.lineTo(px, py);
-              ctx.strokeStyle = 'rgba(251, 146, 60, 0.75)';
-              ctx.lineWidth = 3.5;
-              ctx.lineCap = 'round';
-              ctx.stroke();
-
-              // Plasma glowing orb
-              ctx.beginPath();
-              ctx.arc(px, py, 4.5, 0, 2 * Math.PI);
-              ctx.fillStyle = '#ffedd5';
-              ctx.shadowColor = '#f97316';
-              ctx.shadowBlur = 14;
-              ctx.fill();
-
-              // Core hot nucleus
-              ctx.beginPath();
-              ctx.arc(px, py, 2.2, 0, 2 * Math.PI);
-              ctx.fillStyle = '#ffffff';
-              ctx.fill();
-
-              ctx.restore();
-            }
-          });
-        }
-      });
 
       network.on("selectNode", function (params) {
         if (params.nodes && params.nodes.length > 0) {
@@ -1093,7 +988,7 @@
       openModuleInspector(nodeId);
     }
 
-    // Pulse highlight animation on focused bubble
+    // Focus highlight on selected bubble (clean, static)
     function highlightAndPulseNode(nodeId) {
       if (!nodesDataSet || !nodesDataSet.get(nodeId)) return;
       clearPulse();
@@ -1102,68 +997,37 @@
       const baseNode = rawGraphData ? rawGraphData.nodes.find(n => n.id === nodeId) : null;
       const inDegree = baseNode?.incoming_count || 0;
       const isBottleneck = inDegree >= 2;
-      const baseRadius = Math.min(45, 18 + (inDegree * 4));
+      const baseRadius = Math.min(42, 18 + (inDegree * 4));
 
-      let step = 0;
-      pulseInterval = setInterval(() => {
-        step++;
-        const isPulsePeak = step % 2 === 1;
-        nodesDataSet.update({
-          id: nodeId,
-          size: isPulsePeak ? baseRadius + 10 : baseRadius + 4,
-          borderWidth: isPulsePeak ? 5 : 3,
-          color: {
-            background: isBottleneck ? '#2d0b14' : '#0d1527',
-            border: '#38bdf8',
-            highlight: {
-              background: isBottleneck ? '#4c111e' : '#13223f',
-              border: '#38bdf8'
-            }
-          },
-          shadow: {
-            enabled: true,
-            color: 'rgba(56, 189, 248, 0.95)',
-            size: isPulsePeak ? 28 : 16,
-            x: 0,
-            y: 0
-          }
-        });
-
-        if (step >= 8) {
-          clearInterval(pulseInterval);
-          pulseInterval = null;
-          nodesDataSet.update({
-            id: nodeId,
-            size: baseRadius + 5,
-            borderWidth: 3.5,
-            color: {
-              background: isBottleneck ? '#2d0b14' : '#0d1527',
-              border: '#38bdf8'
-            },
-            shadow: {
-              enabled: true,
-              color: 'rgba(56, 189, 248, 0.75)',
-              size: 20,
-              x: 0,
-              y: 0
-            }
-          });
+      nodesDataSet.update({
+        id: nodeId,
+        size: baseRadius + 4,
+        borderWidth: 3.5,
+        color: {
+          background: isBottleneck ? '#4c111e' : '#13223f',
+          border: '#38bdf8'
+        },
+        shadow: { enabled: false },
+        font: {
+          color: '#ffffff',
+          size: 13,
+          face: 'system-ui, -apple-system, sans-serif',
+          background: '#0f172a',
+          strokeWidth: 2,
+          strokeColor: '#0f172a',
+          margin: 5
         }
-      }, 350);
+      });
     }
 
-    // Clear active pulse animation
+    // Clear active highlight
     function clearPulse() {
-      if (pulseInterval) {
-        clearInterval(pulseInterval);
-        pulseInterval = null;
-      }
       if (activePulseNodeId && nodesDataSet) {
         const baseNode = rawGraphData?.nodes?.find(n => n.id === activePulseNodeId);
         if (baseNode) {
           const inDegree = baseNode.incoming_count || 0;
           const isBottleneck = inDegree >= 2;
-          const baseRadius = Math.min(45, 18 + (inDegree * 4));
+          const baseRadius = Math.min(42, 18 + (inDegree * 4));
 
           nodesDataSet.update({
             id: activePulseNodeId,
@@ -1173,12 +1037,15 @@
               background: isBottleneck ? '#2d0b14' : '#0d1527',
               border: isBottleneck ? '#f43f5e' : '#38bdf8'
             },
-            shadow: {
-              enabled: true,
-              color: isBottleneck ? 'rgba(244, 63, 94, 0.6)' : 'rgba(56, 189, 248, 0.4)',
-              size: isBottleneck ? 15 : 10,
-              x: 0,
-              y: 0
+            shadow: { enabled: false },
+            font: {
+              color: '#ffffff',
+              size: 13,
+              face: 'system-ui, -apple-system, sans-serif',
+              background: '#0f172a',
+              strokeWidth: 2,
+              strokeColor: '#0f172a',
+              margin: 5
             }
           });
         }
@@ -1186,59 +1053,23 @@
       }
     }
 
-    // Visual Feature 1: Start Animated Blast Radius Particle Wave
-    function startBlastParticleWave(targetNodeId, affectedNodes) {
-      isBlastModeActive = true;
-      blastTargetNodeId = targetNodeId;
-      blastAffectedNodes = affectedNodes || [];
-      blastStartTime = performance.now();
-
-      if (blastAnimationId) {
-        cancelAnimationFrame(blastAnimationId);
-      }
-
-      function animLoop() {
-        if (!isBlastModeActive) {
-          if (network) network.redraw();
-          return;
-        }
-        if (network) {
-          network.redraw();
-        }
-        blastAnimationId = requestAnimationFrame(animLoop);
-      }
-      blastAnimationId = requestAnimationFrame(animLoop);
-    }
-
-    // Stop Blast Radius Particle Wave
-    function stopBlastParticleWave() {
-      isBlastModeActive = false;
-      blastTargetNodeId = null;
-      blastAffectedNodes = [];
-      if (blastAnimationId) {
-        cancelAnimationFrame(blastAnimationId);
-        blastAnimationId = null;
-      }
-      if (network) {
-        network.redraw();
-      }
-    }
-
-    // Simulate Blast Radius with Graph Dimming & Particle Wave
+    // Simulate Blast Radius with Crisp Static Colors & Dimmed Unaffected Nodes
     async function simulateBlastRadius(targetNodeId) {
       if (!rawGraphData) return;
       
-      // If time travel dock is active, close it
       if (isTimeTravelActive) {
         closeTimeTravelDock();
       }
 
+      isBlastModeActive = true;
+      blastTargetNodeId = targetNodeId;
       clearPulse();
 
       const blastResult = await fetchBlastRadiusApi(targetNodeId);
       if (!blastResult) return;
 
       const affectedNodes = blastResult.affected_nodes || [];
+      blastAffectedNodes = affectedNodes;
       const affectedSet = new Set(affectedNodes);
 
       const banner = document.getElementById('blast-status-banner');
@@ -1250,83 +1081,77 @@
         banner.classList.remove('hidden');
       }
 
-      // Dim unaffected nodes, highlight danger path
+      // Update nodes to crisp, static high-contrast states
       const nodeUpdates = [];
       nodesDataSet.forEach(node => {
         const id = node.id;
-        const baseSize = node.size || 22;
+        const baseSize = 22;
 
         if (id === targetNodeId) {
-          nodeUpdates.push({
-            id: id,
-            size: baseSize + 8,
-            borderWidth: 4,
-            color: {
-              background: '#2d0b14',
-              border: '#f43f5e',
-              highlight: { background: '#4c111e', border: '#fb7185' }
-            },
-            shadow: {
-              enabled: true,
-              color: 'rgba(244, 63, 94, 0.95)',
-              size: 25,
-              x: 0,
-              y: 0
-            },
-            font: {
-              face: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-              size: 13,
-              color: '#ffffff',
-              strokeWidth: 0,
-              background: 'rgba(15, 23, 42, 0.95)',
-              strokeColor: '#f43f5e',
-              margin: 6
-            }
-          });
-        } else if (affectedSet.has(id)) {
+          // Root selected node: Solid vibrant red/rose (#f43f5e), white text
           nodeUpdates.push({
             id: id,
             size: baseSize + 6,
-            borderWidth: 4,
+            borderWidth: 3,
             color: {
-              background: '#3d1f05',
-              border: '#fb923c',
-              highlight: { background: '#542a07', border: '#fdba74' }
+              background: '#f43f5e',
+              border: '#fda4af',
+              highlight: { background: '#f43f5e', border: '#ffffff' },
+              hover: { background: '#f43f5e', border: '#ffffff' }
             },
-            shadow: {
-              enabled: true,
-              color: 'rgba(251, 146, 60, 0.8)',
-              size: 20,
-              x: 0,
-              y: 0
-            },
+            shadow: { enabled: false },
             font: {
-              face: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-              size: 12,
-              color: '#fed7aa',
-              strokeWidth: 0,
-              background: 'rgba(15, 23, 42, 0.9)',
-              strokeColor: '#fb923c',
-              margin: 6
+              color: '#ffffff',
+              size: 13,
+              face: 'system-ui, -apple-system, sans-serif',
+              background: '#0f172a',
+              strokeWidth: 2,
+              strokeColor: '#0f172a',
+              margin: 5
+            }
+          });
+        } else if (affectedSet.has(id)) {
+          // Affected downstream nodes: Solid amber/orange border (#f97316), dark slate fill (#1e293b), crisp white text
+          nodeUpdates.push({
+            id: id,
+            size: baseSize + 4,
+            borderWidth: 3,
+            color: {
+              background: '#1e293b',
+              border: '#f97316',
+              highlight: { background: '#1e293b', border: '#fb923c' },
+              hover: { background: '#1e293b', border: '#fb923c' }
+            },
+            shadow: { enabled: false },
+            font: {
+              color: '#ffffff',
+              size: 13,
+              face: 'system-ui, -apple-system, sans-serif',
+              background: '#0f172a',
+              strokeWidth: 2,
+              strokeColor: '#0f172a',
+              margin: 5
             }
           });
         } else {
+          // Unaffected nodes: Dim slightly to opacity 0.35 without heavy blur
           nodeUpdates.push({
             id: id,
             size: 14,
             borderWidth: 1,
             color: {
-              background: 'rgba(13, 21, 39, 0.25)',
-              border: 'rgba(71, 85, 105, 0.25)',
-              highlight: { background: 'rgba(30, 41, 59, 0.5)', border: '#64748b' }
+              background: 'rgba(15, 23, 42, 0.35)',
+              border: 'rgba(71, 85, 105, 0.35)',
+              highlight: { background: 'rgba(30, 41, 59, 0.5)', border: '#64748b' },
+              hover: { background: 'rgba(30, 41, 59, 0.5)', border: '#64748b' }
             },
             shadow: { enabled: false },
             font: {
-              face: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-              size: 10,
-              color: '#475569',
-              strokeWidth: 0,
-              background: 'rgba(15, 23, 42, 0.4)',
+              color: 'rgba(148, 163, 184, 0.45)',
+              size: 11,
+              face: 'system-ui, -apple-system, sans-serif',
+              background: 'rgba(15, 23, 42, 0.35)',
+              strokeWidth: 1,
               strokeColor: 'transparent',
               margin: 4
             }
@@ -1335,7 +1160,7 @@
       });
       nodesDataSet.update(nodeUpdates);
 
-      // Edge updates: highlight affected flows with electric orange, dim rest
+      // Edge updates: highlight affected flows with solid orange, dim rest
       const edgeUpdates = [];
       edgesDataSet.forEach(edge => {
         const isTargetToAffected = (edge.to === targetNodeId) || 
@@ -1344,31 +1169,28 @@
         if (isTargetToAffected) {
           edgeUpdates.push({
             id: edge.id,
-            width: 3.0,
+            width: 2.5,
             color: {
-              color: '#fb923c',
-              highlight: '#f97316',
-              hover: '#fdba74',
+              color: '#f97316',
+              highlight: '#fb923c',
+              hover: '#fb923c',
               opacity: 1.0
             },
-            arrows: { to: { enabled: true, scaleFactor: 0.8 } }
+            arrows: { to: { enabled: true, scaleFactor: 0.7 } }
           });
         } else {
           edgeUpdates.push({
             id: edge.id,
             width: 1.0,
             color: {
-              color: 'rgba(71, 85, 105, 0.1)',
-              opacity: 0.1
+              color: 'rgba(71, 85, 105, 0.15)',
+              opacity: 0.15
             },
             arrows: { to: { enabled: true, scaleFactor: 0.3 } }
           });
         }
       });
       edgesDataSet.update(edgeUpdates);
-
-      // Start the animated glowing particle pulses
-      startBlastParticleWave(targetNodeId, affectedNodes);
 
       if (network) {
         const focusIds = [targetNodeId, ...affectedNodes];
@@ -1381,7 +1203,9 @@
 
     // Reset Graph View & Colors
     function resetGraphView() {
-      stopBlastParticleWave();
+      isBlastModeActive = false;
+      blastTargetNodeId = null;
+      blastAffectedNodes = [];
       clearPulse();
 
       const banner = document.getElementById('blast-status-banner');
@@ -1396,7 +1220,7 @@
       }
     }
 
-    // Visual Feature 2: Git History Time-Travel Scrubber Engine
+    // Git History Time-Travel Scrubber Engine
     async function loadGitHistory() {
       try {
         const response = await fetch('/api/git-history');
@@ -1520,7 +1344,7 @@
 
       if (!nodesDataSet) return;
 
-      // Update graph nodes with Thermal Heatmap styling
+      // Update graph nodes with crisp high-contrast Thermal styling
       const nodeUpdates = [];
       const matchedNodeIds = [];
 
@@ -1535,74 +1359,62 @@
           nodeUpdates.push({
             id: id,
             size: baseSize + 6,
-            borderWidth: 4,
+            borderWidth: 3,
             color: {
-              background: '#450a0a', // Bright Thermal Crimson Hotspot
-              border: '#f43f5e',
-              highlight: { background: '#5f1010', border: '#fb7185' }
+              background: '#f43f5e', // Vibrant rose hotspot
+              border: '#fda4af',
+              highlight: { background: '#f43f5e', border: '#ffffff' }
             },
-            shadow: {
-              enabled: true,
-              color: 'rgba(244, 63, 94, 0.95)',
-              size: 24,
-              x: 0,
-              y: 0
-            },
+            shadow: { enabled: false },
             font: {
-              face: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-              size: 13,
               color: '#ffffff',
-              strokeWidth: 0,
-              background: 'rgba(15, 23, 42, 0.95)',
-              strokeColor: '#f43f5e',
-              margin: 6
+              size: 13,
+              face: 'system-ui, -apple-system, sans-serif',
+              background: '#0f172a',
+              strokeWidth: 2,
+              strokeColor: '#0f172a',
+              margin: 5
             }
           });
         } else if (isRecent) {
           nodeUpdates.push({
             id: id,
-            size: baseSize + 2,
+            size: baseSize + 3,
             borderWidth: 3,
             color: {
-              background: '#3d1f05', // Warm Amber
-              border: '#fb923c',
-              highlight: { background: '#542a07', border: '#fdba74' }
+              background: '#1e293b', // Dark slate fill
+              border: '#f97316',      // Solid amber border
+              highlight: { background: '#1e293b', border: '#fb923c' }
             },
-            shadow: {
-              enabled: true,
-              color: 'rgba(251, 146, 60, 0.65)',
-              size: 14,
-              x: 0,
-              y: 0
-            },
+            shadow: { enabled: false },
             font: {
-              face: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-              size: 11,
-              color: '#fed7aa',
-              strokeWidth: 0,
-              background: 'rgba(15, 23, 42, 0.85)',
-              strokeColor: '#fb923c',
+              color: '#ffffff',
+              size: 12,
+              face: 'system-ui, -apple-system, sans-serif',
+              background: '#0f172a',
+              strokeWidth: 2,
+              strokeColor: '#0f172a',
               margin: 5
             }
           });
         } else {
-          // Untouched files cool down to translucent blue
+          // Untouched files cooled down
           nodeUpdates.push({
             id: id,
             size: 14,
             borderWidth: 1,
             color: {
-              background: 'rgba(13, 21, 39, 0.25)',
-              border: 'rgba(56, 189, 248, 0.2)',
-              highlight: { background: 'rgba(30, 41, 59, 0.4)', border: '#38bdf8' }
+              background: 'rgba(15, 23, 42, 0.35)',
+              border: 'rgba(71, 85, 105, 0.35)',
+              highlight: { background: 'rgba(30, 41, 59, 0.5)', border: '#64748b' }
             },
             shadow: { enabled: false },
             font: {
-              face: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-              size: 10,
-              color: '#475569',
-              strokeWidth: 0,
-              background: 'rgba(15, 23, 42, 0.3)',
+              color: 'rgba(148, 163, 184, 0.45)',
+              size: 11,
+              face: 'system-ui, -apple-system, sans-serif',
+              background: 'rgba(15, 23, 42, 0.35)',
+              strokeWidth: 1,
               strokeColor: 'transparent',
               margin: 4
             }
