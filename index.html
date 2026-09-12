@@ -253,19 +253,19 @@
       </div>
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center gap-2 text-slate-300">
-          <span class="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-[#f43f5e] shadow-sm shadow-rose-500/60"></span>
           <span><strong>High Risk Hub</strong> (&ge; 2 Inbound Dependencies)</span>
         </div>
         <div class="flex items-center gap-2 text-slate-300">
-          <span class="w-2.5 h-2.5 rounded-full bg-orange-500 shadow-sm shadow-orange-500/50"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-[#fb923c] shadow-sm shadow-orange-500/60"></span>
           <span><strong>Blast Radius Impact</strong> (Downstream Affected)</span>
         </div>
         <div class="flex items-center gap-2 text-slate-300">
-          <span class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-[#38bdf8] shadow-sm shadow-sky-500/60"></span>
           <span><strong>Standard Module</strong> (&lt; 2 Inbound)</span>
         </div>
         <div class="flex items-center gap-2 text-slate-400">
-          <span class="w-2.5 h-2.5 rounded-full bg-slate-600 opacity-40"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-slate-700 opacity-40"></span>
           <span><strong>Dimmed / Unaffected</strong></span>
         </div>
       </div>
@@ -614,7 +614,7 @@
 
       updateStatsHUD(visibleNodesList, visibleEdgesList);
 
-      // Format nodes: base size 18 + (in_degree * 4), capped at 45
+      // Format nodes: glowing glass orbs with dark translucent fills and neon borders
       const formattedNodes = visibleNodesList.map(node => {
         const inDegree = node.incoming_count || 0;
         const isBottleneck = inDegree >= 2;
@@ -626,36 +626,38 @@
           shape: 'dot',
           size: dynamicRadius,
           color: {
-            background: isBottleneck ? '#ef4444' : '#3b82f6',
-            border: isBottleneck ? '#fca5a5' : '#93c5fd',
+            background: isBottleneck ? '#2d0b14' : '#0d1527',
+            border: isBottleneck ? '#f43f5e' : '#38bdf8',
             highlight: {
-              background: isBottleneck ? '#dc2626' : '#2563eb',
-              border: '#ffffff'
+              background: isBottleneck ? '#4c111e' : '#13223f',
+              border: isBottleneck ? '#fb7185' : '#7dd3fc'
             },
             hover: {
-              background: isBottleneck ? '#f87171' : '#60a5fa',
-              border: '#ffffff'
+              background: isBottleneck ? '#4c111e' : '#13223f',
+              border: isBottleneck ? '#fb7185' : '#7dd3fc'
             }
           },
-          borderWidth: isBottleneck ? 2.5 : 2,
+          borderWidth: isBottleneck ? 3 : 2,
           shadow: {
             enabled: true,
-            color: isBottleneck ? 'rgba(239, 68, 68, 0.55)' : 'rgba(59, 130, 246, 0.45)',
-            size: isBottleneck ? 16 : 10,
+            color: isBottleneck ? 'rgba(244, 63, 94, 0.6)' : 'rgba(56, 189, 248, 0.4)',
+            size: isBottleneck ? 15 : 10,
             x: 0,
             y: 0
           },
           font: {
-            color: '#f8fafc',
-            size: isBottleneck ? 13 : 12,
-            face: 'Inter, system-ui, sans-serif',
-            strokeWidth: 3,
-            strokeColor: '#090d16'
+            face: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+            size: 12,
+            color: '#e2e8f0',
+            strokeWidth: 0,
+            background: 'rgba(15, 23, 42, 0.85)',
+            strokeColor: 'rgba(51, 65, 85, 0.5)',
+            margin: 6
           }
         };
       });
 
-      // Format edges: smooth continuous, rgba(148, 163, 184, 0.25), scaleFactor 0.6
+      // Format edges: smooth continuous neon edges, scaleFactor 0.5, width 1.5
       const formattedEdges = visibleEdgesList.map(edge => ({
         id: `${edge.from}->${edge.to}`,
         from: edge.from,
@@ -663,19 +665,19 @@
         arrows: {
           to: {
             enabled: true,
-            scaleFactor: 0.6,
+            scaleFactor: 0.5,
             type: 'arrow'
           }
         },
         color: {
-          color: 'rgba(148, 163, 184, 0.25)',
-          highlight: '#818cf8',
-          hover: '#a5b4fc',
-          opacity: 0.75
+          color: 'rgba(100, 116, 139, 0.25)',
+          highlight: '#38bdf8',
+          hover: '#38bdf8'
         },
-        width: 1.8,
+        width: 1.5,
         smooth: {
-          type: 'continuous'
+          type: 'continuous',
+          roundness: 0.3
         }
       }));
 
@@ -687,7 +689,15 @@
           scaling: { min: 18, max: 45 }
         },
         edges: {
-          selectionWidth: 2.5
+          selectionWidth: 2.5,
+          smooth: { type: 'continuous', roundness: 0.3 },
+          color: {
+            color: 'rgba(100, 116, 139, 0.25)',
+            highlight: '#38bdf8',
+            hover: '#38bdf8'
+          },
+          arrows: { to: { enabled: true, scaleFactor: 0.5 } },
+          width: 1.5
         },
         physics: {
           enabled: physicsEnabled,
@@ -924,16 +934,16 @@
           size: isPulsePeak ? baseRadius + 10 : baseRadius + 4,
           borderWidth: isPulsePeak ? 5 : 3,
           color: {
-            background: isBottleneck ? '#ef4444' : '#3b82f6',
-            border: '#22c55e',
+            background: isBottleneck ? '#2d0b14' : '#0d1527',
+            border: '#38bdf8',
             highlight: {
-              background: isBottleneck ? '#dc2626' : '#2563eb',
-              border: '#22c55e'
+              background: isBottleneck ? '#4c111e' : '#13223f',
+              border: '#38bdf8'
             }
           },
           shadow: {
             enabled: true,
-            color: 'rgba(34, 197, 94, 0.95)',
+            color: 'rgba(56, 189, 248, 0.95)',
             size: isPulsePeak ? 28 : 16,
             x: 0,
             y: 0
@@ -948,12 +958,12 @@
             size: baseRadius + 5,
             borderWidth: 3.5,
             color: {
-              background: isBottleneck ? '#ef4444' : '#3b82f6',
-              border: '#22c55e'
+              background: isBottleneck ? '#2d0b14' : '#0d1527',
+              border: '#38bdf8'
             },
             shadow: {
               enabled: true,
-              color: 'rgba(34, 197, 94, 0.75)',
+              color: 'rgba(56, 189, 248, 0.75)',
               size: 20,
               x: 0,
               y: 0
@@ -979,15 +989,15 @@
           nodesDataSet.update({
             id: activePulseNodeId,
             size: baseRadius,
-            borderWidth: isBottleneck ? 2.5 : 2,
+            borderWidth: isBottleneck ? 3 : 2,
             color: {
-              background: isBottleneck ? '#ef4444' : '#3b82f6',
-              border: isBottleneck ? '#fca5a5' : '#93c5fd'
+              background: isBottleneck ? '#2d0b14' : '#0d1527',
+              border: isBottleneck ? '#f43f5e' : '#38bdf8'
             },
             shadow: {
               enabled: true,
-              color: isBottleneck ? 'rgba(239, 68, 68, 0.55)' : 'rgba(59, 130, 246, 0.45)',
-              size: isBottleneck ? 16 : 10,
+              color: isBottleneck ? 'rgba(244, 63, 94, 0.6)' : 'rgba(56, 189, 248, 0.4)',
+              size: isBottleneck ? 15 : 10,
               x: 0,
               y: 0
             }
@@ -1028,24 +1038,27 @@
           nodeUpdates.push({
             id: id,
             size: baseSize + 8,
-            borderWidth: 5,
+            borderWidth: 4,
             color: {
-              background: '#ef4444',
-              border: '#fca5a5',
-              highlight: { background: '#dc2626', border: '#ffffff' }
+              background: '#2d0b14',
+              border: '#f43f5e',
+              highlight: { background: '#4c111e', border: '#fb7185' }
             },
             shadow: {
               enabled: true,
-              color: 'rgba(239, 68, 68, 0.95)',
-              size: 28,
+              color: 'rgba(244, 63, 94, 0.95)',
+              size: 25,
               x: 0,
               y: 0
             },
             font: {
+              face: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+              size: 13,
               color: '#ffffff',
-              size: 14,
-              strokeWidth: 4,
-              strokeColor: '#000000'
+              strokeWidth: 0,
+              background: 'rgba(15, 23, 42, 0.95)',
+              strokeColor: '#f43f5e',
+              margin: 6
             }
           });
         } else if (affectedSet.has(id)) {
@@ -1054,22 +1067,25 @@
             size: baseSize + 6,
             borderWidth: 4,
             color: {
-              background: '#f97316',
-              border: '#fed7aa',
-              highlight: { background: '#ea580c', border: '#ffffff' }
+              background: '#3d1f05',
+              border: '#fb923c',
+              highlight: { background: '#542a07', border: '#fdba74' }
             },
             shadow: {
               enabled: true,
-              color: 'rgba(249, 115, 22, 0.9)',
-              size: 22,
+              color: 'rgba(251, 146, 60, 0.8)',
+              size: 20,
               x: 0,
               y: 0
             },
             font: {
-              color: '#fff7ed',
-              size: 13,
-              strokeWidth: 3,
-              strokeColor: '#000000'
+              face: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+              size: 12,
+              color: '#fed7aa',
+              strokeWidth: 0,
+              background: 'rgba(15, 23, 42, 0.9)',
+              strokeColor: '#fb923c',
+              margin: 6
             }
           });
         } else {
@@ -1078,22 +1094,26 @@
             size: 14,
             borderWidth: 1,
             color: {
-              background: 'rgba(30, 41, 59, 0.25)',
+              background: 'rgba(13, 21, 39, 0.25)',
               border: 'rgba(71, 85, 105, 0.25)',
-              highlight: { background: 'rgba(51, 65, 85, 0.5)', border: '#64748b' }
+              highlight: { background: 'rgba(30, 41, 59, 0.5)', border: '#64748b' }
             },
             shadow: { enabled: false },
             font: {
-              color: '#475569',
+              face: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
               size: 10,
-              strokeWidth: 0
+              color: '#475569',
+              strokeWidth: 0,
+              background: 'rgba(15, 23, 42, 0.4)',
+              strokeColor: 'transparent',
+              margin: 4
             }
           });
         }
       });
       nodesDataSet.update(nodeUpdates);
 
-      // Edge updates: highlight affected flows, dim rest
+      // Edge updates: highlight affected flows with electric orange, dim rest
       const edgeUpdates = [];
       edgesDataSet.forEach(edge => {
         const isTargetToAffected = (edge.to === targetNodeId) || 
@@ -1102,14 +1122,14 @@
         if (isTargetToAffected) {
           edgeUpdates.push({
             id: edge.id,
-            width: 3.2,
+            width: 3.0,
             color: {
-              color: '#f97316',
-              highlight: '#ea580c',
-              hover: '#fb923c',
+              color: '#fb923c',
+              highlight: '#f97316',
+              hover: '#fdba74',
               opacity: 1.0
             },
-            arrows: { to: { enabled: true, scaleFactor: 1.0 } }
+            arrows: { to: { enabled: true, scaleFactor: 0.8 } }
           });
         } else {
           edgeUpdates.push({
@@ -1119,10 +1139,9 @@
               color: 'rgba(71, 85, 105, 0.1)',
               opacity: 0.1
             },
-            arrows: { to: { enabled: true, scaleFactor: 0.4 } }
+            arrows: { to: { enabled: true, scaleFactor: 0.3 } }
           });
         }
-      });
       edgesDataSet.update(edgeUpdates);
 
       if (network) {
