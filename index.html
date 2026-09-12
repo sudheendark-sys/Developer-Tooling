@@ -716,11 +716,10 @@
 
       network = new vis.Network(container, { nodes: nodesDataSet, edges: edgesDataSet }, options);
 
-      network.on('click', function(params) {
+      network.on("click", function(params) {
         if (params.nodes.length > 0) {
-          const selectedId = params.nodes[0];
-          clearPulse();
-          inspectNode(selectedId);
+          const selectedNodeId = params.nodes[0];
+          openModuleInspector(selectedNodeId);
         } else {
           clearPulse();
           if (!isBlastModeActive) {
@@ -733,9 +732,15 @@
       network.on('blurNode', () => { container.style.cursor = 'default'; });
     }
 
-    // Inspect a single module and populate the Right Drawer
-    async function inspectNode(nodeId, matchReason = null) {
+    // Open Module Inspector Drawer and Populate Details
+    async function openModuleInspector(nodeId, matchReason = null) {
       currentlySelectedNodeId = nodeId;
+      clearPulse();
+
+      const inspectorPanel = document.getElementById('inspector-panel');
+      if (inspectorPanel) {
+        inspectorPanel.classList.remove('hidden', 'pointer-events-none');
+      }
 
       const emptyState = document.getElementById('inspector-empty-state');
       const activeState = document.getElementById('inspector-active-state');
@@ -755,22 +760,34 @@
       const outboundChips = document.getElementById('inspector-outbound-chips');
       const inboundCount = document.getElementById('inbound-count-badge');
       const outboundCount = document.getElementById('outbound-count-badge');
+      const btnBlast = document.getElementById('btn-blast-radius');
 
-      emptyState.classList.add('hidden');
-      activeState.classList.remove('hidden');
+      if (emptyState) emptyState.classList.add('hidden');
+      if (activeState) activeState.classList.remove('hidden');
 
-      // Natural language query reason banner
-      if (matchReason) {
-        matchBanner.classList.remove('hidden');
-        matchReasonEl.textContent = matchReason;
-      } else {
-        matchBanner.classList.add('hidden');
+      if (filenameEl) filenameEl.textContent = nodeId;
+      if (filepathEl) filepathEl.textContent = nodeId;
+
+      if (summaryEl) {
+        summaryEl.innerHTML = `
+          <div class="flex items-center gap-2 text-slate-400 py-1">
+            <i class="fa-solid fa-circle-notch fa-spin text-indigo-400 text-sm"></i>
+            <span class="text-xs">Analyzing module architecture...</span>
+          </div>
+        `;
       }
 
-      // Initial loading state placeholder
-      filenameEl.textContent = nodeId;
-      filepathEl.textContent = nodeId;
-      summaryEl.innerHTML = '<span class="text-slate-400 italic"><i class="fa-solid fa-spinner fa-spin mr-1.5 text-indigo-400"></i>Analyzing module architecture...</span>';
+      if (btnBlast) {
+        btnBlast.disabled = false;
+        btnBlast.onclick = () => simulateBlastRadius(nodeId);
+      }
+
+      if (matchReason && matchBanner && matchReasonEl) {
+        matchBanner.classList.remove('hidden');
+        matchReasonEl.textContent = matchReason;
+      } else if (matchBanner) {
+        matchBanner.classList.add('hidden');
+      }
 
       const localNode = rawGraphData ? rawGraphData.nodes.find(n => n.id === nodeId) : null;
       const aiResult = await fetchAiExplanation(nodeId);
@@ -779,77 +796,76 @@
       const summary = aiResult?.summary || (localNode ? `Module ${nodeId} in project.` : 'No summary available.');
       const inCount = aiResult?.incoming_dependencies?.length ?? localNode?.incoming_count ?? 0;
       const riskScore = aiResult?.risk_score ?? (inCount >= 2 ? 4 : (inCount === 1 ? 2 : 1));
-      const riskLevel = aiResult?.risk_level || (riskScore >= 4 ? 'Critical Bottleneck' : (riskScore >= 2 ? 'Moderate' : 'Safe'));
-      const blastRadius = aiResult?.blast_radius_warning || 'Downstream impact analysis pending.';
+      const riskLevel = aiResult?.risk_level || (riskScore >= 4 ? 'Bottleneck Hub' : (riskScore >= 2 ? 'Moderate' : 'Safe'));
+      const blastRadius = aiResult?.blast_radius_warning || (inCount > 0 ? `Directly affects ${inCount} downstream dependent module(s).` : 'Isolated module with minimal cascade risk.');
       const provider = aiResult?.provider || 'Architecture Engine';
       const incoming = aiResult?.incoming_dependencies || localNode?.incoming_dependencies || [];
       const outgoing = aiResult?.outgoing_dependencies || localNode?.outgoing_dependencies || [];
 
-      filepathEl.textContent = filePath;
-      filenameEl.textContent = localNode?.label || nodeId;
-      summaryEl.textContent = summary;
-      blastWarningEl.textContent = blastRadius;
-      aiProviderTag.textContent = `Analyzed via ${provider}`;
+      if (filepathEl) filepathEl.textContent = filePath;
+      if (filenameEl) filenameEl.textContent = localNode?.label || nodeId;
+      if (summaryEl) summaryEl.textContent = summary;
+      if (blastWarningEl) blastWarningEl.textContent = blastRadius;
+      if (aiProviderTag) aiProviderTag.textContent = `Analyzed via ${provider}`;
 
-      // Risk level styling
-      if (riskScore >= 4 || inCount >= 2) {
-        riskBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap bg-rose-500/20 text-rose-300 border border-rose-500/40';
-        riskBadgeEl.textContent = 'Bottleneck Hub';
-        riskScoreText.textContent = `Score ${riskScore}/5 (High)`;
-        riskMeterFill.className = 'h-full bg-rose-500 transition-all duration-500 rounded-full';
-        riskMeterFill.style.width = '90%';
-        blastImpactCard.className = 'blast-gradient-border rounded-xl p-4 flex flex-col gap-2.5 shadow-lg';
-      } else if (riskScore >= 2 || inCount === 1) {
-        riskBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap bg-amber-500/20 text-amber-300 border border-amber-500/40';
-        riskBadgeEl.textContent = 'Moderate';
-        riskScoreText.textContent = `Score ${riskScore}/5 (Moderate)`;
-        riskMeterFill.className = 'h-full bg-amber-500 transition-all duration-500 rounded-full';
-        riskMeterFill.style.width = '50%';
-        blastImpactCard.className = 'blast-gradient-border rounded-xl p-4 flex flex-col gap-2.5 shadow-lg';
-      } else {
-        riskBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
-        riskBadgeEl.textContent = 'Safe';
-        riskScoreText.textContent = `Score ${riskScore}/5 (Low)`;
-        riskMeterFill.className = 'h-full bg-emerald-500 transition-all duration-500 rounded-full';
-        riskMeterFill.style.width = '25%';
-        blastImpactCard.className = 'blast-gradient-safe rounded-xl p-4 flex flex-col gap-2.5 shadow-lg';
+      if (riskBadgeEl && riskScoreText && riskMeterFill && blastImpactCard) {
+        if (riskScore >= 4 || inCount >= 2) {
+          riskBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap bg-rose-500/20 text-rose-300 border border-rose-500/40';
+          riskBadgeEl.textContent = 'Bottleneck Hub';
+          riskScoreText.textContent = `Score ${riskScore}/5 (High)`;
+          riskMeterFill.className = 'h-full bg-rose-500 transition-all duration-500 rounded-full';
+          riskMeterFill.style.width = '90%';
+          blastImpactCard.className = 'blast-gradient-border rounded-xl p-4 flex flex-col gap-2.5 shadow-lg';
+        } else if (riskScore >= 2 || inCount === 1) {
+          riskBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap bg-amber-500/20 text-amber-300 border border-amber-500/40';
+          riskBadgeEl.textContent = 'Moderate';
+          riskScoreText.textContent = `Score ${riskScore}/5 (Moderate)`;
+          riskMeterFill.className = 'h-full bg-amber-500 transition-all duration-500 rounded-full';
+          riskMeterFill.style.width = '50%';
+          blastImpactCard.className = 'blast-gradient-border rounded-xl p-4 flex flex-col gap-2.5 shadow-lg';
+        } else {
+          riskBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+          riskBadgeEl.textContent = 'Safe';
+          riskScoreText.textContent = `Score ${riskScore}/5 (Low)`;
+          riskMeterFill.className = 'h-full bg-emerald-500 transition-all duration-500 rounded-full';
+          riskMeterFill.style.width = '25%';
+          blastImpactCard.className = 'blast-gradient-safe rounded-xl p-4 flex flex-col gap-2.5 shadow-lg';
+        }
       }
 
-      // Populate Inbound Dependencies Chips
-      inboundCount.textContent = incoming.length;
-      if (incoming.length > 0) {
-        inboundChips.innerHTML = incoming.map(dep => `
-          <button 
-            onclick="focusAndInspectNode('${dep}')"
-            class="px-2 py-1 bg-cyan-950/50 hover:bg-cyan-900/60 border border-cyan-500/30 hover:border-cyan-400 text-cyan-200 text-[11px] font-mono rounded-lg transition-all flex items-center gap-1 active:scale-95"
-          >
-            <span>${dep}</span>
-            <i class="fa-solid fa-arrow-right text-[9px] text-cyan-400"></i>
-          </button>
-        `).join('');
-      } else {
-        inboundChips.innerHTML = '<span class="text-xs text-slate-500 italic">Root module (No incoming dependencies)</span>';
+      if (inboundCount && inboundChips) {
+        inboundCount.textContent = incoming.length;
+        if (incoming.length > 0) {
+          inboundChips.innerHTML = incoming.map(dep => `
+            <button 
+              onclick="focusAndInspectNode('${dep}')"
+              class="px-2 py-1 bg-cyan-950/50 hover:bg-cyan-900/60 border border-cyan-500/30 hover:border-cyan-400 text-cyan-200 text-[11px] font-mono rounded-lg transition-all flex items-center gap-1 active:scale-95"
+            >
+              <span>${dep}</span>
+              <i class="fa-solid fa-arrow-right text-[9px] text-cyan-400"></i>
+            </button>
+          `).join('');
+        } else {
+          inboundChips.innerHTML = '<span class="text-xs text-slate-500 italic">Root module (No incoming dependencies)</span>';
+        }
       }
 
-      // Populate Outbound Dependencies Chips
-      outboundCount.textContent = outgoing.length;
-      if (outgoing.length > 0) {
-        outboundChips.innerHTML = outgoing.map(dep => `
-          <button 
-            onclick="focusAndInspectNode('${dep}')"
-            class="px-2 py-1 bg-purple-950/50 hover:bg-purple-900/60 border border-purple-500/30 hover:border-purple-400 text-purple-200 text-[11px] font-mono rounded-lg transition-all flex items-center gap-1 active:scale-95"
-          >
-            <span>${dep}</span>
-            <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-purple-400"></i>
-          </button>
-        `).join('');
-      } else {
-        outboundChips.innerHTML = '<span class="text-xs text-slate-500 italic">Leaf module (No external dependencies)</span>';
+      if (outboundCount && outboundChips) {
+        outboundCount.textContent = outgoing.length;
+        if (outgoing.length > 0) {
+          outboundChips.innerHTML = outgoing.map(dep => `
+            <button 
+              onclick="focusAndInspectNode('${dep}')"
+              class="px-2 py-1 bg-purple-950/50 hover:bg-purple-900/60 border border-purple-500/30 hover:border-purple-400 text-purple-200 text-[11px] font-mono rounded-lg transition-all flex items-center gap-1 active:scale-95"
+            >
+              <span>${dep}</span>
+              <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-purple-400"></i>
+            </button>
+          `).join('');
+        } else {
+          outboundChips.innerHTML = '<span class="text-xs text-slate-500 italic">Leaf module (No external dependencies)</span>';
+        }
       }
-
-      // Connect Blast Radius button
-      const btnBlast = document.getElementById('btn-blast-radius');
-      btnBlast.onclick = () => simulateBlastRadius(nodeId);
     }
 
     // Reset Inspector Drawer to Empty State
@@ -859,9 +875,9 @@
       const activeState = document.getElementById('inspector-active-state');
       const matchBanner = document.getElementById('query-match-banner');
 
-      emptyState.classList.remove('hidden');
-      activeState.classList.add('hidden');
-      matchBanner.classList.add('hidden');
+      if (emptyState) emptyState.classList.remove('hidden');
+      if (activeState) activeState.classList.add('hidden');
+      if (matchBanner) matchBanner.classList.add('hidden');
     }
 
     // Focus on a specific node and inspect
@@ -873,7 +889,7 @@
         scale: 1.3,
         animation: { duration: 500, easingFunction: 'easeInOutQuad' }
       });
-      inspectNode(nodeId);
+      openModuleInspector(nodeId);
     }
 
     // Pulse highlight animation on focused bubble
@@ -1149,7 +1165,7 @@
       }
 
       highlightAndPulseNode(targetId);
-      await inspectNode(targetId, result.reason);
+      await openModuleInspector(targetId, result.reason);
     }
 
     // EVENT LISTENERS BINDING

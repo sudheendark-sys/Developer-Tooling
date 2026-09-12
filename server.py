@@ -51,25 +51,51 @@ def get_ast_details(file_path: Path):
 
 
 def resolve_file_in_project(identifier: str, project_dir: Path) -> Path | None:
-    """Find a Python file in project directory by relative path, filename, or stem."""
-    # 1. Direct path check
-    direct = project_dir / identifier
-    if direct.exists() and direct.is_file():
-        return direct
+    """Find a Python file in project directory or cloned_repos by relative path, filename, or stem."""
+    clean_id = identifier.strip().lstrip("/")
 
-    # 2. Add .py if omitted
-    if not identifier.endswith(".py"):
-        with_py = project_dir / f"{identifier}.py"
-        if with_py.exists() and with_py.is_file():
-            return with_py
+    # Candidate project directories to search
+    candidate_dirs = [project_dir]
+    if (BASE_DIR / "test_project") not in candidate_dirs:
+        candidate_dirs.append(BASE_DIR / "test_project")
+    if CLONED_REPOS_DIR.exists():
+        for sub in CLONED_REPOS_DIR.iterdir():
+            if sub.is_dir() and sub not in candidate_dirs:
+                candidate_dirs.append(sub)
 
-    # 3. Search by filename across project
-    target_name = Path(identifier).name
-    if not target_name.endswith(".py"):
-        target_name += ".py"
+    for pdir in candidate_dirs:
+        # 1. Direct path check
+        direct = pdir / clean_id
+        if direct.exists() and direct.is_file():
+            return direct
 
-    for py_file in find_all_py_files(project_dir):
-        if py_file.name == target_name:
+        # 1b. If clean_id begins with pdir.name /
+        if clean_id.startswith(f"{pdir.name}/"):
+            sub_id = clean_id[len(pdir.name) + 1:]
+            direct_sub = pdir / sub_id
+            if direct_sub.exists() and direct_sub.is_file():
+                return direct_sub
+
+        # 2. Add .py if omitted
+        if not clean_id.endswith(".py"):
+            with_py = pdir / f"{clean_id}.py"
+            if with_py.exists() and with_py.is_file():
+                return with_py
+
+        # 3. Match relative path suffix or filename
+        for py_file in find_all_py_files(pdir):
+            try:
+                rel = py_file.relative_to(pdir).as_posix()
+                if rel == clean_id or rel == f"{clean_id}.py":
+                    return py_file
+                if py_file.name == clean_id or py_file.stem == clean_id or py_file.name == Path(clean_id).name:
+                    return py_file
+            except Exception:
+                pass
+
+    # 4. Global fallback across entire workspace
+    for py_file in find_all_py_files(BASE_DIR):
+        if py_file.name == Path(clean_id).name or py_file.name == f"{clean_id}.py":
             return py_file
 
     return None
@@ -471,14 +497,29 @@ def explain_file():
     file_path = resolve_file_in_project(filename, project_dir)
 
     if not file_path or not file_path.exists():
-        return jsonify({"error": f"File '{filename}' not found in {CURRENT_REPO_NAME}."}), 404
+        return jsonify({"error": f"File '{filename}' not found."}), 404
 
-    graph_data = build_graph_data(str(project_dir), None)
-    rel_path = file_path.relative_to(project_dir).as_posix()
-    
+    # Determine which directory the file is located in
+    actual_project_dir = project_dir
+    if CLONED_REPOS_DIR.exists() and str(file_path).startswith(str(CLONED_REPOS_DIR)):
+        for sub in CLONED_REPOS_DIR.iterdir():
+            if sub.is_dir() and str(file_path).startswith(str(sub)):
+                actual_project_dir = sub
+                break
+    elif str(file_path).startswith(str(BASE_DIR / "test_project")):
+        actual_project_dir = BASE_DIR / "test_project"
+
+    try:
+        rel_path = file_path.relative_to(actual_project_dir).as_posix()
+    except ValueError:
+        rel_path = file_path.name
+
+    repo_display_name = actual_project_dir.name
+    graph_data = build_graph_data(str(actual_project_dir), None)
+
     # Match node metadata
     node_meta = next(
-        (n for n in graph_data["nodes"] if n["id"] == rel_path or n["id"] == filename or n["label"] == file_path.name),
+        (n for n in graph_data["nodes"] if n["id"] == rel_path or n["id"] == filename or n["label"] == file_path.name or n.get("rel_path") == rel_path),
         {"incoming_dependencies": [], "outgoing_dependencies": [], "incoming_count": 0, "outgoing_count": 0}
     )
 
@@ -491,7 +532,7 @@ def explain_file():
             explanation = call_gemini_explain(gemini_key, rel_path, source_code, node_meta)
             explanation["incoming_dependencies"] = node_meta.get("incoming_dependencies", [])
             explanation["outgoing_dependencies"] = node_meta.get("outgoing_dependencies", [])
-            explanation["file_path"] = f"{CURRENT_REPO_NAME}/{rel_path}"
+            explanation["file_path"] = f"{repo_display_name}/{rel_path}"
             return jsonify(explanation)
         except Exception as e:
             print(f"Gemini API call failed, falling back to heuristic: {e}")
@@ -499,7 +540,7 @@ def explain_file():
     explanation = generate_heuristic_explanation(rel_path, source_code, ast_info, node_meta)
     explanation["incoming_dependencies"] = node_meta.get("incoming_dependencies", [])
     explanation["outgoing_dependencies"] = node_meta.get("outgoing_dependencies", [])
-    explanation["file_path"] = f"{CURRENT_REPO_NAME}/{rel_path}"
+    explanation["file_path"] = f"{repo_display_name}/{rel_path}"
     return jsonify(explanation)
 
 
